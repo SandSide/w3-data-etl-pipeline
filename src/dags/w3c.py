@@ -269,13 +269,11 @@ build_dim_date_task = PythonOperator(
 #    dag=dag,
 # )
 
-# uniq = BashOperator(
-#     task_id='uniqIP',
-#     bash_command=uniqCommand,
-# #     bash_command='echo 'hello' > /home/airflow/gcs/Staging/hello.txt',
-
-#     dag=dag,
-# )
+unique_ip_task = BashOperator(
+    task_id = 'unique_ip',
+    bash_command = 'sort -u ' + STAGING + 'dim-ip.txt > ' + STAGING + 'dim-ip-uniq.txt',
+    dag = dag,
+)
 
 # uniq2 = BashOperator(
 #     task_id='uniqDate',
@@ -297,12 +295,13 @@ build_dim_date_task = PythonOperator(
 # download_data >> BuildFact1 >>DimIp>>DateTable>>uniq>>uniq2>>BuildDimDate>>IPTable
 # BuildFact1.set_upstream(task_or_task_list=[download_data])
 # DimIp.set_upstream(task_or_task_list=[BuildFact1])
-
+# DateTable.set_upstream(task_or_task_list=[BuildFact1])
 #clean_raw_data.set_upstream(task_or_task_list=[create_dir])
 
 create_directory_task >> clean_raw_data_task >> build_fact_1_task >> [build_dim_ip_task, build_dim_date_task]
 
-# DateTable.set_upstream(task_or_task_list=[BuildFact1])
+unique_ip_task.set_upstream(task_or_task_list=build_dim_ip_task)
+
 # uniq2.set_upstream(task_or_task_list=[DateTable])
 # uniq.set_upstream(task_or_task_list=[DimIp])
 # BuildDimDate.set_upstream(task_or_task_list=[uniq2])
