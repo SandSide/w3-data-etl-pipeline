@@ -1,0 +1,29 @@
+[2024-03-27T20:14:12.154+0000] {taskinstance.py:1979} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: Process_W3_Data.create_directories manual__2024-03-27T20:14:02.173563+00:00 [queued]>
+[2024-03-27T20:14:12.179+0000] {taskinstance.py:1979} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: Process_W3_Data.create_directories manual__2024-03-27T20:14:02.173563+00:00 [queued]>
+[2024-03-27T20:14:12.180+0000] {taskinstance.py:2193} INFO - Starting attempt 1 of 1
+[2024-03-27T20:14:12.225+0000] {taskinstance.py:2217} INFO - Executing <Task(PythonOperator): create_directories> on 2024-03-27 20:14:02.173563+00:00
+[2024-03-27T20:14:12.246+0000] {standard_task_runner.py:60} INFO - Started process 136 to run task
+[2024-03-27T20:14:12.258+0000] {standard_task_runner.py:87} INFO - Running: ['***', 'tasks', 'run', 'Process_W3_Data', 'create_directories', 'manual__2024-03-27T20:14:02.173563+00:00', '--job-id', '4', '--raw', '--subdir', 'DAGS_FOLDER/w3c.py', '--cfg-path', '/tmp/tmpy6sknqb9']
+[2024-03-27T20:14:12.266+0000] {standard_task_runner.py:88} INFO - Job 4: Subtask create_directories
+[2024-03-27T20:14:12.391+0000] {task_command.py:423} INFO - Running <TaskInstance: Process_W3_Data.create_directories manual__2024-03-27T20:14:02.173563+00:00 [running]> on host d9bdcddb4bab
+[2024-03-27T20:14:12.539+0000] {taskinstance.py:2513} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='***' AIRFLOW_CTX_DAG_ID='Process_W3_Data' AIRFLOW_CTX_TASK_ID='create_directories' AIRFLOW_CTX_EXECUTION_DATE='2024-03-27T20:14:02.173563+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2024-03-27T20:14:02.173563+00:00'
+[2024-03-27T20:14:12.549+0000] {logging_mixin.py:188} INFO - Creating directories
+[2024-03-27T20:14:12.558+0000] {logging_mixin.py:188} INFO - Current working directory: /opt/***
+[2024-03-27T20:14:12.563+0000] {logging_mixin.py:188} INFO - Can't make BaseDir
+[2024-03-27T20:14:12.569+0000] {taskinstance.py:2731} ERROR - Task failed with exception
+Traceback (most recent call last):
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/models/taskinstance.py", line 444, in _execute_task
+    result = _execute_callable(context=context, **execute_callable_kwargs)
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/models/taskinstance.py", line 414, in _execute_callable
+    return execute_callable(context=context, **execute_callable_kwargs)
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/operators/python.py", line 200, in execute
+    return_value = self.execute_callable()
+  File "/home/airflow/.local/lib/python3.8/site-packages/airflow/operators/python.py", line 217, in execute_callable
+    return self.python_callable(*self.op_args, **self.op_kwargs)
+  File "/opt/airflow/dags/w3c.py", line 47, in CreateDirectory
+    os.mkdir(RAW_DATA)
+FileNotFoundError: [Errno 2] No such file or directory: '/opt/airflow/data/raw/W3SVC1/'
+[2024-03-27T20:14:12.598+0000] {taskinstance.py:1149} INFO - Marking task as FAILED. dag_id=Process_W3_Data, task_id=create_directories, execution_date=20240327T201402, start_date=20240327T201412, end_date=20240327T201412
+[2024-03-27T20:14:12.625+0000] {standard_task_runner.py:107} ERROR - Failed to execute job 4 for task create_directories ([Errno 2] No such file or directory: '/opt/airflow/data/raw/W3SVC1/'; 136)
+[2024-03-27T20:14:12.677+0000] {local_task_job_runner.py:234} INFO - Task exited with return code 1
+[2024-03-27T20:14:12.728+0000] {taskinstance.py:3312} INFO - 0 downstream tasks scheduled from follow-on schedule check

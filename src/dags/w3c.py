@@ -15,10 +15,10 @@ import logging
 
 
 # Global variables
-BaseDir = "w3c-data"
-RawFiles = BaseDir + "/Raw/"
-Staging = BaseDir + "/Staging/"
-StarSchema = BaseDir + "/StarSchema/"
+BASE_DIR = "/opt/airflow/data"
+RAW_DATA = BASE_DIR + "/W3SVC1/"
+STAGING = BASE_DIR + "/staging/"
+STAR_SCHEMA = BASE_DIR + "/star-schema/"
 
 
 
@@ -26,8 +26,8 @@ StarSchema = BaseDir + "/StarSchema/"
 # DimUnicIP=open(Staging+'DimIPUniq.txt', 'w')
 # uniqCommand="sort "+Staging+"DimIP.txt | uniq > "+Staging+'DimIPUniq.txt'
 
-uniqCommand = "sort -u " + Staging + "DimIP.txt > " + Staging + 'DimIPUniq.txt'
-uniqDateCommand = "sort -u " + Staging + "DimDate.txt > " + Staging + 'DimDateUniq.txt'
+# uniqCommand = "sort -u " + Staging + "DimIP.txt > " + Staging + 'DimIPUniq.txt'
+# uniqDateCommand = "sort -u " + Staging + "DimDate.txt > " + Staging + 'DimDateUniq.txt'
 
 # uniqCommand="sort -u -o "+Staging+"DimIPUniq.txt " +Staging+"DimIP.txt"
 # 2>"+Staging+"errors.txt"
@@ -35,34 +35,23 @@ uniqDateCommand = "sort -u " + Staging + "DimDate.txt > " + Staging + 'DimDateUn
 def CreateDirectory():
     
     print("Creating directories")
-    print("Current working directory:", os.getcwd())
-    try:   
-        os.mkdir(BaseDir)
-        print("Directory created at:", os.path.abspath(BaseDir))
-    except FileExistsError:
-        print("Can't make BaseDir")
-    
-    try:
-        os.mkdir(RawFiles)
-    except FileExistsError:
-        print("Can't make BaseDir") 
-    
+        
     try: 
-        os.mkdir(Staging)
+        os.mkdir(STAGING)
     except FileExistsError:
-        print("Can't make BaseDir") 
+        print("Can't make staging dir") 
     
     try:
-        os.mkdir(StarSchema)
+        os.mkdir(STAR_SCHEMA)
     except FileExistsError:
-        print("Can't make BaseDir") 
+        print("Can't make star schema dir") 
         
     print("Finished creating directories")
 
 
 def ListFiles():
    
-   arr=os.listdir(RawFiles)
+   arr=os.listdir(RAW_DATA)
    
    if not arr:
       print('List arr is empty')
@@ -75,146 +64,146 @@ def ListFiles():
     #    CleanHash(f)
 
 
-def CleanHash(filename):
-    print('Cleaning ',filename)
-    logging.warning('Cleaning '+filename)
-    print (uniqCommand)
-    type=filename[-3:len(filename)]
-    if (type=="log"):
+# def CleanHash(filename):
+#     print('Cleaning ',filename)
+#     logging.warning('Cleaning '+filename)
+#     print (uniqCommand)
+#     type=filename[-3:len(filename)]
+#     if (type=="log"):
     
-        OutputFileShort=open(Staging+'Outputshort.txt', 'a')
-        OutputFileLong=open(Staging+'Outputlong.txt', 'a')
+#         OutputFileShort=open(Staging+'Outputshort.txt', 'a')
+#         OutputFileLong=open(Staging+'Outputlong.txt', 'a')
 
-        InFile = open(RawFiles+filename,'r')
+#         InFile = open(RawFiles+filename,'r')
     
-        Lines= InFile.readlines()
-        for line in Lines:
-            if (line[0]!="#"):
-                Split=line.split(" ")
+#         Lines= InFile.readlines()
+#         for line in Lines:
+#             if (line[0]!="#"):
+#                 Split=line.split(" ")
                 
-                if (len(Split)==14):
+#                 if (len(Split)==14):
                    
-                   OutputFileShort.write(line)
-#                    print('Short ',filename,len(Split))
-                else:
-                   if (len(Split)==18):
-                       OutputFileLong.write(line)
-#                        print('Long ',filename,len(Split))
-                   else:
-                       print ("Fault "+str(len(Split)))
+#                    OutputFileShort.write(line)
+# #                    print('Short ',filename,len(Split))
+#                 else:
+#                    if (len(Split)==18):
+#                        OutputFileLong.write(line)
+# #                        print('Long ',filename,len(Split))
+#                    else:
+#                        print ("Fault "+str(len(Split)))
     
 # def DeleteFiles():
 #     OutputFileShort=open(Staging+'Outputshort.txt', 'w')
 #     OutputFileLong=open(Staging+'Outputlong.txt', 'w')
 
        
-def BuildFactShort():
-    InFile = open(Staging+'Outputshort.txt','r')
-    OutFact1=open(Staging+'OutFact1.txt', 'a')
+# def BuildFactShort():
+#     InFile = open(Staging+'Outputshort.txt','r')
+#     OutFact1=open(Staging+'OutFact1.txt', 'a')
 
-    Lines= InFile.readlines()
-    for line in Lines:
-        Split=line.split(" ")
-        Browser=Split[9].replace(",","")
-        Out=Split[0]+","+Split[1]+","+Browser+","+Split[8]+","+Split[13]
+#     Lines= InFile.readlines()
+#     for line in Lines:
+#         Split=line.split(" ")
+#         Browser=Split[9].replace(",","")
+#         Out=Split[0]+","+Split[1]+","+Browser+","+Split[8]+","+Split[13]
 
-        OutFact1.write(Out)
+#         OutFact1.write(Out)
 
-def BuildFactLong():
-    InFile = open(Staging+'Outputlong.txt','r')
-    OutFact1=open(Staging+'OutFact1.txt', 'a')
+# def BuildFactLong():
+#     InFile = open(Staging+'Outputlong.txt','r')
+#     OutFact1=open(Staging+'OutFact1.txt', 'a')
 
-    Lines= InFile.readlines()
-    for line in Lines:
-        Split=line.split(" ")
-        Browser=Split[9].replace(",","")
-        Out=Split[0]+","+Split[1]+","+Browser+","+Split[8]+","+Split[16]
-        OutFact1.write(Out)
+#     Lines= InFile.readlines()
+#     for line in Lines:
+#         Split=line.split(" ")
+#         Browser=Split[9].replace(",","")
+#         Out=Split[0]+","+Split[1]+","+Browser+","+Split[8]+","+Split[16]
+#         OutFact1.write(Out)
 
-def Fact1():
-    with open(Staging+'OutFact1.txt', 'w') as file:
-        file.write("Date,Time,Browser,IP,ResponseTime\n")
-    BuildFactShort()
-    BuildFactLong()
+# def Fact1():
+#     with open(Staging+'OutFact1.txt', 'w') as file:
+#         file.write("Date,Time,Browser,IP,ResponseTime\n")
+#     BuildFactShort()
+#     BuildFactLong()
  
-def getIPs():
-    InFile = open(Staging+'OutFact1.txt', 'r')
-    OutputFile=open(Staging+'DimIP.txt', 'w')
-    Lines= InFile.readlines()
-    for line in Lines:
-        Split=line.split(",")
-        Out=Split[3]+"\n"
-        OutputFile.write(Out)
-def makeDimDate():
-    InFile = open(Staging+'OutFact1.txt', 'r')
-    OutputFile=open(Staging+'DimDate.txt', 'w')
+# def getIPs():
+#     InFile = open(Staging+'OutFact1.txt', 'r')
+#     OutputFile=open(Staging+'DimIP.txt', 'w')
+#     Lines= InFile.readlines()
+#     for line in Lines:
+#         Split=line.split(",")
+#         Out=Split[3]+"\n"
+#         OutputFile.write(Out)
+# def makeDimDate():
+#     InFile = open(Staging+'OutFact1.txt', 'r')
+#     OutputFile=open(Staging+'DimDate.txt', 'w')
 
-    Lines= InFile.readlines()
-    for line in Lines:
-        Split=line.split(",")
-        Out=Split[0]+"\n"
-        OutputFile.write(Out)
+#     Lines= InFile.readlines()
+#     for line in Lines:
+#         Split=line.split(",")
+#         Out=Split[0]+"\n"
+#         OutputFile.write(Out)
  
-Days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+# Days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
 
  
-def getDates():
-    InDateFile = open(Staging+'DimDateUniq.txt', 'r')   
-    OutputDateFile=open(StarSchema+'DimDateTable.txt', 'w')
-    with OutputDateFile as file:
-       file.write("Date,Year,Month,Day,DayofWeek\n")
-    Lines= InDateFile.readlines()
+# def getDates():
+#     InDateFile = open(Staging+'DimDateUniq.txt', 'r')   
+#     OutputDateFile=open(StarSchema+'DimDateTable.txt', 'w')
+#     with OutputDateFile as file:
+#        file.write("Date,Year,Month,Day,DayofWeek\n")
+#     Lines= InDateFile.readlines()
     
-    for line in Lines:
-        line=line.replace("\n","")
-        print(line)
-        try:
-            date=datetime.strptime(line,"%Y-%m-%d").date()
-            weekday=Days[date.weekday()]
-            out=str(date)+","+str(date.year)+","+str(date.month)+","+str(date.day)+","+weekday+"\n"
+#     for line in Lines:
+#         line=line.replace("\n","")
+#         print(line)
+#         try:
+#             date=datetime.strptime(line,"%Y-%m-%d").date()
+#             weekday=Days[date.weekday()]
+#             out=str(date)+","+str(date.year)+","+str(date.month)+","+str(date.day)+","+weekday+"\n"
             
-            with open(StarSchema+'DimDateTable.txt', 'a') as file:
-               file.write(out)
-        except:
-            print("Error with Date")
+#             with open(StarSchema+'DimDateTable.txt', 'a') as file:
+#                file.write(out)
+#         except:
+#             print("Error with Date")
             
-def GetLocations():
-    DimTablename=StarSchema+'DimIPLoc.txt'
-    try:
-        file_stats = os.stat(DimTablename)
+# def GetLocations():
+#     DimTablename=StarSchema+'DimIPLoc.txt'
+#     try:
+#         file_stats = os.stat(DimTablename)
     
-        if (file_stats.st_size >2):
-           print("Dim IP Table Exists")
-           return
-    except:
-        print("Dim Table IP does not exist, creating one")
-    InFile=open(Staging+'DimIPUniq.txt', 'r')
-    OutFile=open(StarSchema+'DimIPLoc.txt', 'w')
+#         if (file_stats.st_size >2):
+#            print("Dim IP Table Exists")
+#            return
+#     except:
+#         print("Dim Table IP does not exist, creating one")
+#     InFile=open(Staging+'DimIPUniq.txt', 'r')
+#     OutFile=open(StarSchema+'DimIPLoc.txt', 'w')
     
     
-    Lines= InFile.readlines()
-    for line in Lines:
-        line=line.replace("\n","")
-        # URL to send the request to
-        request_url = 'https://geolocation-db.com/jsonp/' + line
-#         print (request_url)
-        # Send request and decode the result
-        try:
-            response = requests.get(request_url)
-            result = response.content.decode()
-        except:
-            print ("error reponse"+result)
-        try:
-        # Clean the returned string so it just contains the dictionary data for the IP address
-            result = result.split("(")[1].strip(")")
-        # Convert this data into a dictionary
-            result  = json.loads(result)
-            out=line+","+str(result["country_code"])+","+str(result["country_name"])+","+str(result["city"])+","+str(result["latitude"])+","+str(result["longitude"])+"\n"
-#            print(out)
-            with open(StarSchema+'DimIPLoc.txt', 'a') as file:
-               file.write(out)
-        except:
-            print ("error getting location")
+#     Lines= InFile.readlines()
+#     for line in Lines:
+#         line=line.replace("\n","")
+#         # URL to send the request to
+#         request_url = 'https://geolocation-db.com/jsonp/' + line
+# #         print (request_url)
+#         # Send request and decode the result
+#         try:
+#             response = requests.get(request_url)
+#             result = response.content.decode()
+#         except:
+#             print ("error reponse"+result)
+#         try:
+#         # Clean the returned string so it just contains the dictionary data for the IP address
+#             result = result.split("(")[1].strip(")")
+#         # Convert this data into a dictionary
+#             result  = json.loads(result)
+#             out=line+","+str(result["country_code"])+","+str(result["country_name"])+","+str(result["city"])+","+str(result["latitude"])+","+str(result["longitude"])+"\n"
+# #            print(out)
+#             with open(StarSchema+'DimIPLoc.txt', 'a') as file:
+#                file.write(out)
+#         except:
+#             print ("error getting location")
 
 dag = DAG(                                                     
    dag_id="Process_W3_Data",                          
