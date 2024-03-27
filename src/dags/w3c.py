@@ -137,17 +137,21 @@ def build_dim_ip():
         out = split[3] + '\n'
         output_file.write(out)
 
-# def makeDimDate():
-#     InFile = open(Staging+'OutFact1.txt', 'r')
-#     OutputFile=open(Staging+'DimDate.txt', 'w')
+def build_dim_date():
+    
+    in_file = open(STAGING + 'out-fact-1.txt', 'r')
+    out_file = open(STAGING + 'dim-date.txt', 'w')
 
-#     Lines= InFile.readlines()
-#     for line in Lines:
-#         Split=line.split(',')
-#         Out=Split[0]+'\n'
-#         OutputFile.write(Out)
+    lines = in_file.readlines()
+    
+    for line in lines:
+        split = line.split(',')
+        out = split[0] + '\n'
+        out_file.write(out)
  
-# Days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+
+
+#Days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
  
 # def getDates():
@@ -241,11 +245,11 @@ build_dim_ip_task = PythonOperator(
     dag = dag,
 )
 
-# DateTable = PythonOperator(
-#     task_id='DateTable',
-#     python_callable=makeDimDate,
-#     dag=dag,
-# )
+build_dim_date_task = PythonOperator(
+    task_id = 'build_dim_date',
+    python_callable = build_dim_date,
+    dag = dag,
+)
 
 # IPTable = PythonOperator(
 #     task_id='IPTable',
@@ -291,13 +295,13 @@ build_dim_ip_task = PythonOperator(
  
   
 # download_data >> BuildFact1 >>DimIp>>DateTable>>uniq>>uniq2>>BuildDimDate>>IPTable
+# BuildFact1.set_upstream(task_or_task_list=[download_data])
+# DimIp.set_upstream(task_or_task_list=[BuildFact1])
 
 #clean_raw_data.set_upstream(task_or_task_list=[create_dir])
 
-create_directory_task >> clean_raw_data_task >> build_fact_1_task >> build_dim_ip_task
+create_directory_task >> clean_raw_data_task >> build_fact_1_task >> [build_dim_ip_task, build_dim_date_task]
 
-# BuildFact1.set_upstream(task_or_task_list=[download_data])
-# DimIp.set_upstream(task_or_task_list=[BuildFact1])
 # DateTable.set_upstream(task_or_task_list=[BuildFact1])
 # uniq2.set_upstream(task_or_task_list=[DateTable])
 # uniq.set_upstream(task_or_task_list=[DimIp])
