@@ -1,4 +1,4 @@
-
 /src/logs/scheduler
 /src/logs
 /src/dags/__pycache__
+/src/data/staging
