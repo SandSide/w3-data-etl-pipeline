@@ -21,7 +21,7 @@ STAGING = BASE_DIR + '/staging/'
 STAR_SCHEMA = BASE_DIR + '/star-schema/'
 
    
-def CreateDirectory():
+def create_directory():
     
     print('Creating directories')
         
@@ -38,7 +38,7 @@ def CreateDirectory():
     print('Finished creating directories')
 
 
-def CleanRawData():
+def clean_raw_data():
    
    arr=os.listdir(RAW_DATA)
    
@@ -47,13 +47,13 @@ def CleanRawData():
 
    logging.debug('Raw file list:' + ','.join(str(element) for element in arr)) 
    
-   ClearFiles()
+   clear_files()
    
    for f in arr:
-       CleanHash(f)
+       clean_hash(f)
 
 
-def CleanHash(filename):
+def clean_hash(filename):
     
     logging.debug('Cleaning ' + filename)
     
@@ -84,20 +84,20 @@ def CleanHash(filename):
                         logging.debug('Fault ' + str(len(Split)))
     
     
-def ClearFiles():
+def clear_files():
     OutputFileShort = open(STAGING + 'output-short.txt', 'w')
     OutputFileLong = open(STAGING + 'output-long.txt', 'w')
    
     
-def BuildFact1():
+def build_fact_1():
     with open(STAGING + 'out-fact-1.txt', 'w') as file:
         file.write('Date,Time,Browser,IP,ResponseTime\n')
         
-    BuildFactShort()
-    BuildFactLong()
+    build_fact_short()
+    build_fact_long()
  
        
-def BuildFactShort():
+def build_fact_short():
     InFile = open(STAGING + 'output-short.txt','r')
     OutFact1 = open(STAGING + 'out-fact-1.txt', 'a')
 
@@ -111,7 +111,7 @@ def BuildFactShort():
         OutFact1.write(Out)
 
 
-def BuildFactLong():
+def build_fact_long():
     InFile = open(STAGING + 'output-long.txt', 'r')
     OutFact1 = open(STAGING + 'out-fact-1.txt', 'a')
 
@@ -124,7 +124,7 @@ def BuildFactLong():
         
         OutFact1.write(Out)
  
-def ExtractIPs():
+def build_dim_ip():
     
     in_file = open(STAGING + 'out-fact-1.txt', 'r')
     output_file = open(STAGING + 'dim-ip.txt', 'w')
@@ -216,28 +216,28 @@ dag = DAG(
 )
 
 
-create_dir = PythonOperator(
+create_directory_task = PythonOperator(
     task_id = 'create_directories',
-    python_callable = CreateDirectory,
+    python_callable = create_directory,
     dag = dag,
 )
 
 
-clean_raw_data = PythonOperator(
+clean_raw_data_task = PythonOperator(
    task_id = 'clean_raw_data',
-   python_callable = CleanRawData, 
+   python_callable = clean_raw_data, 
    dag = dag,
 )
 
-build_fact_1 = PythonOperator(
+build_fact_1_task = PythonOperator(
     task_id = 'build_fact_1',
-    python_callable = BuildFact1,
+    python_callable = build_fact_1,
     dag = dag, 
 )
 
-build_dim_ip = PythonOperator(
+build_dim_ip_task = PythonOperator(
     task_id = 'build_dim_ip',
-    python_callable = ExtractIPs,
+    python_callable = build_dim_ip,
     dag = dag,
 )
 
@@ -294,7 +294,7 @@ build_dim_ip = PythonOperator(
 
 #clean_raw_data.set_upstream(task_or_task_list=[create_dir])
 
-create_dir >> clean_raw_data >> build_fact_1 >> build_dim_ip
+create_directory_task >> clean_raw_data_task >> build_fact_1_task >> build_dim_ip_task
 
 # BuildFact1.set_upstream(task_or_task_list=[download_data])
 # DimIp.set_upstream(task_or_task_list=[BuildFact1])
