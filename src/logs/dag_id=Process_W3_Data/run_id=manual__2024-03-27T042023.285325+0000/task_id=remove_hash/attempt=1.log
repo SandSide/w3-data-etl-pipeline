@@ -1,0 +1,15 @@
+[2024-03-27T04:20:29.338+0000] {taskinstance.py:1979} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: Process_W3_Data.remove_hash manual__2024-03-27T04:20:23.285325+00:00 [queued]>
+[2024-03-27T04:20:29.351+0000] {taskinstance.py:1979} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: Process_W3_Data.remove_hash manual__2024-03-27T04:20:23.285325+00:00 [queued]>
+[2024-03-27T04:20:29.352+0000] {taskinstance.py:2193} INFO - Starting attempt 1 of 1
+[2024-03-27T04:20:29.372+0000] {taskinstance.py:2217} INFO - Executing <Task(PythonOperator): remove_hash> on 2024-03-27 04:20:23.285325+00:00
+[2024-03-27T04:20:29.383+0000] {standard_task_runner.py:60} INFO - Started process 942 to run task
+[2024-03-27T04:20:29.389+0000] {standard_task_runner.py:87} INFO - Running: ['***', 'tasks', 'run', 'Process_W3_Data', 'remove_hash', 'manual__2024-03-27T04:20:23.285325+00:00', '--job-id', '18', '--raw', '--subdir', 'DAGS_FOLDER/w3c.py', '--cfg-path', '/tmp/tmpnzh8m7mb']
+[2024-03-27T04:20:29.394+0000] {standard_task_runner.py:88} INFO - Job 18: Subtask remove_hash
+[2024-03-27T04:20:29.466+0000] {task_command.py:423} INFO - Running <TaskInstance: Process_W3_Data.remove_hash manual__2024-03-27T04:20:23.285325+00:00 [running]> on host 94418fe46b42
+[2024-03-27T04:20:29.584+0000] {taskinstance.py:2513} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='***' AIRFLOW_CTX_DAG_ID='Process_W3_Data' AIRFLOW_CTX_TASK_ID='remove_hash' AIRFLOW_CTX_EXECUTION_DATE='2024-03-27T04:20:23.285325+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='manual__2024-03-27T04:20:23.285325+00:00'
+[2024-03-27T04:20:29.588+0000] {logging_mixin.py:188} INFO - List arr is empty
+[2024-03-27T04:20:29.589+0000] {w3c.py:69} WARNING - Starting List Files
+[2024-03-27T04:20:29.590+0000] {python.py:202} INFO - Done. Returned value was: None
+[2024-03-27T04:20:29.603+0000] {taskinstance.py:1149} INFO - Marking task as SUCCESS. dag_id=Process_W3_Data, task_id=remove_hash, execution_date=20240327T042023, start_date=20240327T042029, end_date=20240327T042029
+[2024-03-27T04:20:29.642+0000] {local_task_job_runner.py:234} INFO - Task exited with return code 0
+[2024-03-27T04:20:29.667+0000] {taskinstance.py:3312} INFO - 0 downstream tasks scheduled from follow-on schedule check

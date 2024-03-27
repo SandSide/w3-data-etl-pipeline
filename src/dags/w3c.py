@@ -13,35 +13,66 @@ import json
 import mysql.connector
 import logging
 
-BaseDir="/home/airflow/gcs/data"
-RawFiles=BaseDir+"/Raw/"
-Staging=BaseDir+"/Staging/"
-StarSchema=BaseDir+"/StarSchema/"
+
+# Global variables
+BaseDir = "w3c-data"
+RawFiles = BaseDir + "/Raw/"
+Staging = BaseDir + "/Staging/"
+StarSchema = BaseDir + "/StarSchema/"
+
+
+
 # DimIP = open(Staging+'DimIP.txt', 'r')
 # DimUnicIP=open(Staging+'DimIPUniq.txt', 'w')
 # uniqCommand="sort "+Staging+"DimIP.txt | uniq > "+Staging+'DimIPUniq.txt'
 
-uniqCommand="sort -u "+Staging+"DimIP.txt > "+Staging+'DimIPUniq.txt'
-uniqDateCommand="sort -u "+Staging+"DimDate.txt > "+Staging+'DimDateUniq.txt'
+uniqCommand = "sort -u " + Staging + "DimIP.txt > " + Staging + 'DimIPUniq.txt'
+uniqDateCommand = "sort -u " + Staging + "DimDate.txt > " + Staging + 'DimDateUniq.txt'
 
 # uniqCommand="sort -u -o "+Staging+"DimIPUniq.txt " +Staging+"DimIP.txt"
 # 2>"+Staging+"errors.txt"
-try:   
-   os.mkdir(BaseDir)
-except:
-   print("Can't make BaseDir")
-try:
-   os.mkdir(RawFiles)
-except:
-   print("Can't make BaseDir") 
-try: 
-   os.mkdir(Staging)
-except:
-   print("Can't make BaseDir") 
-try:
-   os.mkdir(StarSchema)
-except:
-   print("Can't make BaseDir") 
+   
+def CreateDirectory():
+    
+    print("Creating directories")
+    print("Current working directory:", os.getcwd())
+    try:   
+        os.mkdir(BaseDir)
+        print("Directory created at:", os.path.abspath(BaseDir))
+    except FileExistsError:
+        print("Can't make BaseDir")
+    
+    try:
+        os.mkdir(RawFiles)
+    except FileExistsError:
+        print("Can't make BaseDir") 
+    
+    try: 
+        os.mkdir(Staging)
+    except FileExistsError:
+        print("Can't make BaseDir") 
+    
+    try:
+        os.mkdir(StarSchema)
+    except FileExistsError:
+        print("Can't make BaseDir") 
+        
+    print("Finished creating directories")
+
+
+def ListFiles():
+   
+   arr=os.listdir(RawFiles)
+   
+   if not arr:
+      print('List arr is empty')
+
+   logging.warning('Starting List Files' + ",".join(str(element) for element in arr)) 
+   
+#    DeleteFiles()
+   for f in arr:
+       logging.warning('calling Clean '+f)
+    #    CleanHash(f)
 
 
 def CleanHash(filename):
@@ -72,25 +103,10 @@ def CleanHash(filename):
                    else:
                        print ("Fault "+str(len(Split)))
     
-def DeleteFiles():
-    OutputFileShort=open(Staging+'Outputshort.txt', 'w')
-    OutputFileLong=open(Staging+'Outputlong.txt', 'w')
+# def DeleteFiles():
+#     OutputFileShort=open(Staging+'Outputshort.txt', 'w')
+#     OutputFileLong=open(Staging+'Outputlong.txt', 'w')
 
-def ListFiles():
-   
-   arr=os.listdir(RawFiles)
-   
-   if not arr:
-      print('List arr is empty')
-
-# Output:
-# 'List is empty'
-
-   logging.warning('Starting List Files' +",".join(str(element) for element in arr)) 
-   DeleteFiles()
-   for f in arr:
-       logging.warning('calling Clean '+f)
-       CleanHash(f)
        
 def BuildFactShort():
     InFile = open(Staging+'Outputshort.txt','r')
@@ -206,74 +222,91 @@ dag = DAG(
    start_date=dt.datetime(2023, 2, 24), 
    catchup=False,
 )
+
+# check_dir = BashOperator(
+#     task_id='check_directories',
+#     bash_command='ls',#[ -d /home/airflow/gcs/data/Raw/ ] && echo "Raw directory exists" || echo "Raw directory does not exist"',
+#     dag=dag,
+# )
+
+
+create_dir_task = PythonOperator(
+    task_id='create_directories',
+    python_callable=CreateDirectory,
+    dag=dag,
+)
+
+
 download_data = PythonOperator(
-   task_id="RemoveHash",
+   task_id="remove_hash",
    python_callable=ListFiles, 
    dag=dag,
 )
 
-DimIp = PythonOperator(
-    task_id="DimIP",
-    python_callable=getIPs,
-    dag=dag,
-)
+# DimIp = PythonOperator(
+#     task_id="DimIP",
+#     python_callable=getIPs,
+#     dag=dag,
+# )
 
-DateTable = PythonOperator(
-    task_id="DateTable",
-    python_callable=makeDimDate,
-    dag=dag,
-)
+# DateTable = PythonOperator(
+#     task_id="DateTable",
+#     python_callable=makeDimDate,
+#     dag=dag,
+# )
 
-IPTable = PythonOperator(
-    task_id="IPTable",
-    python_callable=GetLocations,
-    dag=dag,
-)
+# IPTable = PythonOperator(
+#     task_id="IPTable",
+#     python_callable=GetLocations,
+#     dag=dag,
+# )
 
-BuildFact1 = PythonOperator(
-   task_id="BuildFact1",
-   python_callable= Fact1,
-   dag=dag,
-)
+# BuildFact1 = PythonOperator(
+#    task_id="BuildFact1",
+#    python_callable= Fact1,
+#    dag=dag,
+# )
 
-BuildDimDate = PythonOperator(
-   task_id="BuildDimDate",
-   python_callable=getDates, 
-   dag=dag,
-)
+# BuildDimDate = PythonOperator(
+#    task_id="BuildDimDate",
+#    python_callable=getDates, 
+#    dag=dag,
+# )
 
-uniq = BashOperator(
-    task_id="uniqIP",
-    bash_command=uniqCommand,
-#     bash_command="echo 'hello' > /home/airflow/gcs/Staging/hello.txt",
+# uniq = BashOperator(
+#     task_id="uniqIP",
+#     bash_command=uniqCommand,
+# #     bash_command="echo 'hello' > /home/airflow/gcs/Staging/hello.txt",
 
-    dag=dag,
-)
+#     dag=dag,
+# )
 
-uniq2 = BashOperator(
-    task_id="uniqDate",
-    bash_command=uniqDateCommand,
-#     bash_command="echo 'hello' > /home/airflow/gcs/Staging/hello.txt",
+# uniq2 = BashOperator(
+#     task_id="uniqDate",
+#     bash_command=uniqDateCommand,
+# #     bash_command="echo 'hello' > /home/airflow/gcs/Staging/hello.txt",
 
-    dag=dag,
-)
+#     dag=dag,
+# )
 
-copyfact = BashOperator(
-    task_id="copyfact",
-#    bash_command=uniqDateCommand,
-     bash_command="cp /home/airflow/gcs/data/Staging/OutFact1.txt /home/airflow/gcs/data/StarSchema/OutFact1.txt",
+# copyfact = BashOperator(
+#     task_id="copyfact",
+# #    bash_command=uniqDateCommand,
+#      bash_command="cp /home/airflow/gcs/data/Staging/OutFact1.txt /home/airflow/gcs/data/StarSchema/OutFact1.txt",
 
-    dag=dag,
-)
+#     dag=dag,
+# )
  
   
 # download_data >> BuildFact1 >>DimIp>>DateTable>>uniq>>uniq2>>BuildDimDate>>IPTable
 
-BuildFact1.set_upstream(task_or_task_list=[download_data])
-DimIp.set_upstream(task_or_task_list=[BuildFact1])
-DateTable.set_upstream(task_or_task_list=[BuildFact1])
-uniq2.set_upstream(task_or_task_list=[DateTable])
-uniq.set_upstream(task_or_task_list=[DimIp])
-BuildDimDate.set_upstream(task_or_task_list=[uniq2])
-IPTable.set_upstream(task_or_task_list=[uniq])
-copyfact.set_upstream(task_or_task_list=[IPTable,BuildDimDate])
+download_data.set_upstream(task_or_task_list=[create_dir_task])
+
+# BuildFact1.set_upstream(task_or_task_list=[download_data])
+# DimIp.set_upstream(task_or_task_list=[BuildFact1])
+# DateTable.set_upstream(task_or_task_list=[BuildFact1])
+# uniq2.set_upstream(task_or_task_list=[DateTable])
+# uniq.set_upstream(task_or_task_list=[DimIp])
+# BuildDimDate.set_upstream(task_or_task_list=[uniq2])
+# IPTable.set_upstream(task_or_task_list=[uniq])
+# copyfact.set_upstream(task_or_task_list=[IPTable,BuildDimDate])
