@@ -15,27 +15,27 @@ import logging
 
 
 # Global variables
-BASE_DIR = "/opt/airflow/data"
-RAW_DATA = BASE_DIR + "/W3SVC1/"
-STAGING = BASE_DIR + "/staging/"
-STAR_SCHEMA = BASE_DIR + "/star-schema/"
+BASE_DIR = '/opt/airflow/data'
+RAW_DATA = BASE_DIR + '/W3SVC1/'
+STAGING = BASE_DIR + '/staging/'
+STAR_SCHEMA = BASE_DIR + '/star-schema/'
 
    
 def CreateDirectory():
     
-    print("Creating directories")
+    print('Creating directories')
         
     try: 
         os.mkdir(STAGING)
     except FileExistsError:
-        print("Can't make staging dir") 
+        print('Cant make staging dir') 
     
     try:
         os.mkdir(STAR_SCHEMA)
     except FileExistsError:
-        print("Can't make star schema dir") 
+        print('Cant make star schema dir') 
         
-    print("Finished creating directories")
+    print('Finished creating directories')
 
 
 def CleanRawData():
@@ -43,9 +43,9 @@ def CleanRawData():
    arr=os.listdir(RAW_DATA)
    
    if not arr:
-      print("Raw data folder is empty")
+      print('Raw data folder is empty')
 
-   logging.debug("Raw file list:" + ",".join(str(element) for element in arr)) 
+   logging.debug('Raw file list:' + ','.join(str(element) for element in arr)) 
    
    ClearFiles()
    
@@ -55,109 +55,120 @@ def CleanRawData():
 
 def CleanHash(filename):
     
-    logging.debug("Cleaning " + filename)
+    logging.debug('Cleaning ' + filename)
     
     type = filename[-3:len(filename)]
     
-    if (type == "log"):
+    if (type == 'log'):
     
-        OutputFileShort = open(STAGING + "output-short.txt", "a")
-        OutputFileLong = open(STAGING + "output-long.txt", "a")
+        OutputFileShort = open(STAGING + 'output-short.txt', 'a')
+        OutputFileLong = open(STAGING + 'output-long.txt', 'a')
 
-        InFile = open(RAW_DATA + filename, "r")
+        InFile = open(RAW_DATA + filename, 'r')
     
         Lines= InFile.readlines()
         
         for line in Lines:
-            if (line[0] != "#"):
+            if (line[0] != '#'):
                 
-                Split=line.split(" ")
+                Split = line.split(' ')
                 
                 if (len(Split) == 14):
                     OutputFileShort.write(line)
-                    logging.debug("Short ", filename, len(Split))
+                    logging.debug('Short ', filename, len(Split))
                 else:
                     if (len(Split) == 18):
                         OutputFileLong.write(line)
-                        logging.debug("Long ", filename, len(Split))
+                        logging.debug('Long ', filename, len(Split))
                     else:
-                        logging.debug("Fault " + str(len(Split)))
+                        logging.debug('Fault ' + str(len(Split)))
     
     
 def ClearFiles():
-    OutputFileShort = open(STAGING + "output-short.txt", "w")
-    OutputFileLong = open(STAGING + "output-long.txt", "w")
-
-       
-# def BuildFactShort():
-#     InFile = open(Staging+'Outputshort.txt','r')
-#     OutFact1=open(Staging+'OutFact1.txt', 'a')
-
-#     Lines= InFile.readlines()
-#     for line in Lines:
-#         Split=line.split(" ")
-#         Browser=Split[9].replace(",","")
-#         Out=Split[0]+","+Split[1]+","+Browser+","+Split[8]+","+Split[13]
-
-#         OutFact1.write(Out)
-
-# def BuildFactLong():
-#     InFile = open(Staging+'Outputlong.txt','r')
-#     OutFact1=open(Staging+'OutFact1.txt', 'a')
-
-#     Lines= InFile.readlines()
-#     for line in Lines:
-#         Split=line.split(" ")
-#         Browser=Split[9].replace(",","")
-#         Out=Split[0]+","+Split[1]+","+Browser+","+Split[8]+","+Split[16]
-#         OutFact1.write(Out)
-
-# def Fact1():
-#     with open(Staging+'OutFact1.txt', 'w') as file:
-#         file.write("Date,Time,Browser,IP,ResponseTime\n")
-#     BuildFactShort()
-#     BuildFactLong()
+    OutputFileShort = open(STAGING + 'output-short.txt', 'w')
+    OutputFileLong = open(STAGING + 'output-long.txt', 'w')
+   
+    
+def BuildFact1():
+    with open(STAGING + 'out-fact-1.txt', 'w') as file:
+        file.write('Date,Time,Browser,IP,ResponseTime\n')
+        
+    BuildFactShort()
+    BuildFactLong()
  
-# def getIPs():
-#     InFile = open(Staging+'OutFact1.txt', 'r')
-#     OutputFile=open(Staging+'DimIP.txt', 'w')
-#     Lines= InFile.readlines()
-#     for line in Lines:
-#         Split=line.split(",")
-#         Out=Split[3]+"\n"
-#         OutputFile.write(Out)
+       
+def BuildFactShort():
+    InFile = open(STAGING + 'output-short.txt','r')
+    OutFact1 = open(STAGING + 'out-fact-1.txt', 'a')
+
+    Lines = InFile.readlines()
+    
+    for line in Lines:
+        Split = line.split(' ')
+        Browser = Split[9].replace(',','')
+        Out = Split[0] + ',' + Split[1] + ',' + Browser + ',' + Split[8] + ',' + Split[13]
+
+        OutFact1.write(Out)
+
+
+def BuildFactLong():
+    InFile = open(STAGING + 'output-long.txt', 'r')
+    OutFact1 = open(STAGING + 'out-fact-1.txt', 'a')
+
+    Lines = InFile.readlines()
+    
+    for line in Lines:
+        Split=line.split(' ')
+        Browser=Split[9].replace(',','')
+        Out = Split[0] + ',' + Split[1] + ',' + Browser + ',' + Split[8] + ',' + Split[16]
+        
+        OutFact1.write(Out)
+ 
+def ExtractIPs():
+    
+    in_file = open(STAGING + 'out-fact-1.txt', 'r')
+    output_file = open(STAGING + 'dim-ip.txt', 'w')
+    
+    lines= in_file.readlines()
+    
+    for line in lines:
+        
+        split = line.split(',')
+        out = split[3] + '\n'
+        output_file.write(out)
+
 # def makeDimDate():
 #     InFile = open(Staging+'OutFact1.txt', 'r')
 #     OutputFile=open(Staging+'DimDate.txt', 'w')
 
 #     Lines= InFile.readlines()
 #     for line in Lines:
-#         Split=line.split(",")
-#         Out=Split[0]+"\n"
+#         Split=line.split(',')
+#         Out=Split[0]+'\n'
 #         OutputFile.write(Out)
  
-# Days=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+# Days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
  
 # def getDates():
 #     InDateFile = open(Staging+'DimDateUniq.txt', 'r')   
 #     OutputDateFile=open(StarSchema+'DimDateTable.txt', 'w')
 #     with OutputDateFile as file:
-#        file.write("Date,Year,Month,Day,DayofWeek\n")
+#        file.write('Date,Year,Month,Day,DayofWeek\n')
 #     Lines= InDateFile.readlines()
     
 #     for line in Lines:
-#         line=line.replace("\n","")
+#         line=line.replace('\n','')
 #         print(line)
 #         try:
-#             date=datetime.strptime(line,"%Y-%m-%d").date()
+#             date=datetime.strptime(line,'%Y-%m-%d').date()
 #             weekday=Days[date.weekday()]
-#             out=str(date)+","+str(date.year)+","+str(date.month)+","+str(date.day)+","+weekday+"\n"
+#             out=str(date)+','+str(date.year)+','+str(date.month)+','+str(date.day)+','+weekday+'\n'
             
 #             with open(StarSchema+'DimDateTable.txt', 'a') as file:
 #                file.write(out)
 #         except:
-#             print("Error with Date")
+#             print('Error with Date')
             
 # def GetLocations():
 #     DimTablename=StarSchema+'DimIPLoc.txt'
@@ -165,17 +176,17 @@ def ClearFiles():
 #         file_stats = os.stat(DimTablename)
     
 #         if (file_stats.st_size >2):
-#            print("Dim IP Table Exists")
+#            print('Dim IP Table Exists')
 #            return
 #     except:
-#         print("Dim Table IP does not exist, creating one")
+#         print('Dim Table IP does not exist, creating one')
 #     InFile=open(Staging+'DimIPUniq.txt', 'r')
 #     OutFile=open(StarSchema+'DimIPLoc.txt', 'w')
     
     
 #     Lines= InFile.readlines()
 #     for line in Lines:
-#         line=line.replace("\n","")
+#         line=line.replace('\n','')
 #         # URL to send the request to
 #         request_url = 'https://geolocation-db.com/jsonp/' + line
 # #         print (request_url)
@@ -184,22 +195,22 @@ def ClearFiles():
 #             response = requests.get(request_url)
 #             result = response.content.decode()
 #         except:
-#             print ("error reponse"+result)
+#             print ('error reponse'+result)
 #         try:
 #         # Clean the returned string so it just contains the dictionary data for the IP address
-#             result = result.split("(")[1].strip(")")
+#             result = result.split('(')[1].strip(')')
 #         # Convert this data into a dictionary
 #             result  = json.loads(result)
-#             out=line+","+str(result["country_code"])+","+str(result["country_name"])+","+str(result["city"])+","+str(result["latitude"])+","+str(result["longitude"])+"\n"
+#             out=line+','+str(result['country_code'])+','+str(result['country_name'])+','+str(result['city'])+','+str(result['latitude'])+','+str(result['longitude'])+'\n'
 # #            print(out)
 #             with open(StarSchema+'DimIPLoc.txt', 'a') as file:
 #                file.write(out)
 #         except:
-#             print ("error getting location")
+#             print ('error getting location')
 
 dag = DAG(                                                     
-   dag_id = "Process_W3_Data",                          
-   schedule_interval = "@daily",                                     
+   dag_id = 'Process_W3_Data',                          
+   schedule_interval = '@daily',                                     
    start_date = dt.datetime(2023, 2, 24), 
    catchup = False,
 )
@@ -213,62 +224,67 @@ create_dir = PythonOperator(
 
 
 clean_raw_data = PythonOperator(
-   task_id = "clean_raw_data",
+   task_id = 'clean_raw_data',
    python_callable = CleanRawData, 
-   #provide_context = False,
    dag = dag,
 )
 
-# DimIp = PythonOperator(
-#     task_id="DimIP",
-#     python_callable=getIPs,
-#     dag=dag,
-# )
+build_fact_1 = PythonOperator(
+    task_id = 'build_fact_1',
+    python_callable = BuildFact1,
+    dag = dag, 
+)
+
+build_dim_ip = PythonOperator(
+    task_id = 'build_dim_ip',
+    python_callable = ExtractIPs,
+    dag = dag,
+)
 
 # DateTable = PythonOperator(
-#     task_id="DateTable",
+#     task_id='DateTable',
 #     python_callable=makeDimDate,
 #     dag=dag,
 # )
 
 # IPTable = PythonOperator(
-#     task_id="IPTable",
+#     task_id='IPTable',
 #     python_callable=GetLocations,
 #     dag=dag,
 # )
 
 # BuildFact1 = PythonOperator(
-#    task_id="BuildFact1",
+#    task_id='BuildFact1',
 #    python_callable= Fact1,
 #    dag=dag,
 # )
 
 # BuildDimDate = PythonOperator(
-#    task_id="BuildDimDate",
+#    task_id='BuildDimDate',
 #    python_callable=getDates, 
 #    dag=dag,
 # )
 
 # uniq = BashOperator(
-#     task_id="uniqIP",
+#     task_id='uniqIP',
 #     bash_command=uniqCommand,
-# #     bash_command="echo 'hello' > /home/airflow/gcs/Staging/hello.txt",
+# #     bash_command='echo 'hello' > /home/airflow/gcs/Staging/hello.txt',
 
 #     dag=dag,
 # )
 
 # uniq2 = BashOperator(
-#     task_id="uniqDate",
+#     task_id='uniqDate',
 #     bash_command=uniqDateCommand,
-# #     bash_command="echo 'hello' > /home/airflow/gcs/Staging/hello.txt",
+# #     bash_command='echo 'hello' > /home/airflow/gcs/Staging/hello.txt',
 
 #     dag=dag,
 # )
 
 # copyfact = BashOperator(
-#     task_id="copyfact",
+#     task_id='copyfact',
 # #    bash_command=uniqDateCommand,
-#      bash_command="cp /home/airflow/gcs/data/Staging/OutFact1.txt /home/airflow/gcs/data/StarSchema/OutFact1.txt",
+#      bash_command='cp /home/airflow/gcs/data/Staging/OutFact1.txt /home/airflow/gcs/data/StarSchema/OutFact1.txt',
 
 #     dag=dag,
 # )
@@ -276,7 +292,9 @@ clean_raw_data = PythonOperator(
   
 # download_data >> BuildFact1 >>DimIp>>DateTable>>uniq>>uniq2>>BuildDimDate>>IPTable
 
-clean_raw_data.set_upstream(task_or_task_list=[create_dir])
+#clean_raw_data.set_upstream(task_or_task_list=[create_dir])
+
+create_dir >> clean_raw_data >> build_fact_1 >> build_dim_ip
 
 # BuildFact1.set_upstream(task_or_task_list=[download_data])
 # DimIp.set_upstream(task_or_task_list=[BuildFact1])
