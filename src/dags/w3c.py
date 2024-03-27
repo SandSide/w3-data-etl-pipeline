@@ -20,17 +20,6 @@ RAW_DATA = BASE_DIR + "/W3SVC1/"
 STAGING = BASE_DIR + "/staging/"
 STAR_SCHEMA = BASE_DIR + "/star-schema/"
 
-
-
-# DimIP = open(Staging+'DimIP.txt', 'r')
-# DimUnicIP=open(Staging+'DimIPUniq.txt', 'w')
-# uniqCommand="sort "+Staging+"DimIP.txt | uniq > "+Staging+'DimIPUniq.txt'
-
-# uniqCommand = "sort -u " + Staging + "DimIP.txt > " + Staging + 'DimIPUniq.txt'
-# uniqDateCommand = "sort -u " + Staging + "DimDate.txt > " + Staging + 'DimDateUniq.txt'
-
-# uniqCommand="sort -u -o "+Staging+"DimIPUniq.txt " +Staging+"DimIP.txt"
-# 2>"+Staging+"errors.txt"
    
 def CreateDirectory():
     
@@ -49,52 +38,55 @@ def CreateDirectory():
     print("Finished creating directories")
 
 
-def ListFiles():
+def CleanRawData():
    
    arr=os.listdir(RAW_DATA)
    
    if not arr:
-      print('List arr is empty')
+      print("Raw data folder is empty")
 
-   logging.warning('Starting List Files' + ",".join(str(element) for element in arr)) 
+   logging.debug("Raw file list:" + ",".join(str(element) for element in arr)) 
    
-#    DeleteFiles()
+   ClearFiles()
+   
    for f in arr:
-       logging.warning('calling Clean '+f)
-    #    CleanHash(f)
+       CleanHash(f)
 
 
-# def CleanHash(filename):
-#     print('Cleaning ',filename)
-#     logging.warning('Cleaning '+filename)
-#     print (uniqCommand)
-#     type=filename[-3:len(filename)]
-#     if (type=="log"):
+def CleanHash(filename):
     
-#         OutputFileShort=open(Staging+'Outputshort.txt', 'a')
-#         OutputFileLong=open(Staging+'Outputlong.txt', 'a')
-
-#         InFile = open(RawFiles+filename,'r')
+    logging.debug("Cleaning " + filename)
     
-#         Lines= InFile.readlines()
-#         for line in Lines:
-#             if (line[0]!="#"):
-#                 Split=line.split(" ")
+    type = filename[-3:len(filename)]
+    
+    if (type == "log"):
+    
+        OutputFileShort = open(STAGING + "output-short.txt", "a")
+        OutputFileLong = open(STAGING + "output-long.txt", "a")
+
+        InFile = open(RAW_DATA + filename, "r")
+    
+        Lines= InFile.readlines()
+        
+        for line in Lines:
+            if (line[0] != "#"):
                 
-#                 if (len(Split)==14):
-                   
-#                    OutputFileShort.write(line)
-# #                    print('Short ',filename,len(Split))
-#                 else:
-#                    if (len(Split)==18):
-#                        OutputFileLong.write(line)
-# #                        print('Long ',filename,len(Split))
-#                    else:
-#                        print ("Fault "+str(len(Split)))
+                Split=line.split(" ")
+                
+                if (len(Split) == 14):
+                    OutputFileShort.write(line)
+                    logging.debug("Short ", filename, len(Split))
+                else:
+                    if (len(Split) == 18):
+                        OutputFileLong.write(line)
+                        logging.debug("Long ", filename, len(Split))
+                    else:
+                        logging.debug("Fault " + str(len(Split)))
     
-# def DeleteFiles():
-#     OutputFileShort=open(Staging+'Outputshort.txt', 'w')
-#     OutputFileLong=open(Staging+'Outputlong.txt', 'w')
+    
+def ClearFiles():
+    OutputFileShort = open(STAGING + "output-short.txt", "w")
+    OutputFileLong = open(STAGING + "output-long.txt", "w")
 
        
 # def BuildFactShort():
@@ -206,30 +198,25 @@ def ListFiles():
 #             print ("error getting location")
 
 dag = DAG(                                                     
-   dag_id="Process_W3_Data",                          
-   schedule_interval="@daily",                                     
-   start_date=dt.datetime(2023, 2, 24), 
-   catchup=False,
-)
-
-# check_dir = BashOperator(
-#     task_id='check_directories',
-#     bash_command='ls',#[ -d /home/airflow/gcs/data/Raw/ ] && echo "Raw directory exists" || echo "Raw directory does not exist"',
-#     dag=dag,
-# )
-
-
-create_dir_task = PythonOperator(
-    task_id='create_directories',
-    python_callable=CreateDirectory,
-    dag=dag,
+   dag_id = "Process_W3_Data",                          
+   schedule_interval = "@daily",                                     
+   start_date = dt.datetime(2023, 2, 24), 
+   catchup = False,
 )
 
 
-download_data = PythonOperator(
-   task_id="remove_hash",
-   python_callable=ListFiles, 
-   dag=dag,
+create_dir = PythonOperator(
+    task_id = 'create_directories',
+    python_callable = CreateDirectory,
+    dag = dag,
+)
+
+
+clean_raw_data = PythonOperator(
+   task_id = "clean_raw_data",
+   python_callable = CleanRawData, 
+   #provide_context = False,
+   dag = dag,
 )
 
 # DimIp = PythonOperator(
@@ -289,7 +276,7 @@ download_data = PythonOperator(
   
 # download_data >> BuildFact1 >>DimIp>>DateTable>>uniq>>uniq2>>BuildDimDate>>IPTable
 
-download_data.set_upstream(task_or_task_list=[create_dir_task])
+clean_raw_data.set_upstream(task_or_task_list=[create_dir])
 
 # BuildFact1.set_upstream(task_or_task_list=[download_data])
 # DimIp.set_upstream(task_or_task_list=[BuildFact1])
