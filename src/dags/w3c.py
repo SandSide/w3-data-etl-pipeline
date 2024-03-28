@@ -150,29 +150,34 @@ def build_dim_date():
         out_file.write(out)
  
 
-
-#Days=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
 
  
-# def getDates():
-#     InDateFile = open(Staging+'DimDateUniq.txt', 'r')   
-#     OutputDateFile=open(StarSchema+'DimDateTable.txt', 'w')
-#     with OutputDateFile as file:
-#        file.write('Date,Year,Month,Day,DayofWeek\n')
-#     Lines= InDateFile.readlines()
+def build_dim_date_table():
     
-#     for line in Lines:
-#         line=line.replace('\n','')
-#         print(line)
-#         try:
-#             date=datetime.strptime(line,'%Y-%m-%d').date()
-#             weekday=Days[date.weekday()]
-#             out=str(date)+','+str(date.year)+','+str(date.month)+','+str(date.day)+','+weekday+'\n'
+    in_file = open(STAGING + 'dim-date-uniq.txt', 'r')   
+    out_file = open(STAR_SCHEMA + 'dim-date-table.txt', 'w')
+    
+    with out_file as file:
+       file.write('Date,Year,Month,Day,DayofWeek\n')
+       
+    lines = in_file.readlines()
+    
+    for line in lines:
+        
+        line = line.replace('\n','')
+        print(line)
+        
+        try:
+            date = datetime.strptime(line,'%Y-%m-%d').date()
+            weekday = DAYS[date.weekday()]
             
-#             with open(StarSchema+'DimDateTable.txt', 'a') as file:
-#                file.write(out)
-#         except:
-#             print('Error with Date')
+            out = str(date) + ',' + str(date.year) + ',' + str(date.month) + ',' + str(date.day) + ',' + weekday + '\n'
+            
+            with open(STAR_SCHEMA + 'dim-date-table.txt', 'a') as file:
+               file.write(out)
+        except:
+            logging.error('Error with creating Date table')
             
 # def GetLocations():
 #     DimTablename=StarSchema+'DimIPLoc.txt'
@@ -251,7 +256,7 @@ build_dim_date_task = PythonOperator(
     dag = dag,
 )
 
-# IPTable = PythonOperator(
+# build_dim_ip_loc= PythonOperator(
 #     task_id='IPTable',
 #     python_callable=GetLocations,
 #     dag=dag,
@@ -263,11 +268,11 @@ build_dim_date_task = PythonOperator(
 #    dag=dag,
 # )
 
-# BuildDimDate = PythonOperator(
-#    task_id='BuildDimDate',
-#    python_callable=getDates, 
-#    dag=dag,
-# )
+build_dim_date_table_task = PythonOperator(
+   task_id = 'build_dim_date_table',
+   python_callable = build_dim_date_table, 
+   dag = dag,
+)
 
 unique_ip_task = BashOperator(
     task_id = 'unique_ip',
@@ -302,6 +307,10 @@ create_directory_task >> clean_raw_data_task >> build_fact_1_task >> [build_dim_
 
 unique_ip_task.set_upstream(task_or_task_list=build_dim_ip_task)
 unique_date_task.set_upstream(task_or_task_list=build_dim_date_task)
+
+build_dim_date_table_task.set_upstream(task_or_task_list=unique_date_task)
+
+
 
 
 # BuildDimDate.set_upstream(task_or_task_list=[uniq2])

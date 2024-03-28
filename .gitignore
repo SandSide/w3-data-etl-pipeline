@@ -2,3 +2,4 @@
 /src/logs
 /src/dags/__pycache__
 /src/data/staging
+/src/data/star-schema
