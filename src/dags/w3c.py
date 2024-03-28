@@ -124,7 +124,7 @@ def build_fact_long():
         
         OutFact1.write(Out)
  
-def build_dim_ip():
+def extract_ip():
     
     in_file = open(STAGING + 'out-fact-1.txt', 'r')
     output_file = open(STAGING + 'dim-ip.txt', 'w')
@@ -137,7 +137,7 @@ def build_dim_ip():
         out = split[3] + '\n'
         output_file.write(out)
 
-def build_dim_date():
+def extract_date():
     
     in_file = open(STAGING + 'out-fact-1.txt', 'r')
     out_file = open(STAGING + 'dim-date.txt', 'w')
@@ -178,6 +178,7 @@ def build_dim_date_table():
                file.write(out)
         except:
             logging.error('Error with creating Date table')
+           
             
 # def GetLocations():
 #     DimTablename=StarSchema+'DimIPLoc.txt'
@@ -217,6 +218,7 @@ def build_dim_date_table():
 #         except:
 #             print ('error getting location')
 
+
 dag = DAG(                                                     
    dag_id = 'Process_W3_Data',                          
    schedule_interval = '@daily',                                     
@@ -244,34 +246,16 @@ build_fact_1_task = PythonOperator(
     dag = dag, 
 )
 
-build_dim_ip_task = PythonOperator(
-    task_id = 'build_dim_ip',
-    python_callable = build_dim_ip,
+extract_ip_task = PythonOperator(
+    task_id = 'extract_ip',
+    python_callable = extract_ip,
     dag = dag,
 )
 
-build_dim_date_task = PythonOperator(
-    task_id = 'build_dim_date',
-    python_callable = build_dim_date,
+extract_date_task = PythonOperator(
+    task_id = 'extract_date',
+    python_callable = extract_date,
     dag = dag,
-)
-
-# build_dim_ip_loc= PythonOperator(
-#     task_id='IPTable',
-#     python_callable=GetLocations,
-#     dag=dag,
-# )
-
-# BuildFact1 = PythonOperator(
-#    task_id='BuildFact1',
-#    python_callable= Fact1,
-#    dag=dag,
-# )
-
-build_dim_date_table_task = PythonOperator(
-   task_id = 'build_dim_date_table',
-   python_callable = build_dim_date_table, 
-   dag = dag,
 )
 
 unique_ip_task = BashOperator(
@@ -286,6 +270,29 @@ unique_date_task = BashOperator(
     dag = dag,
 )
 
+build_dim_date_table_task = PythonOperator(
+   task_id = 'build_dim_date_table',
+   python_callable = build_dim_date_table, 
+   dag = dag,
+)
+
+# build_dim_ip_table_task = PythonOperator(
+#     task_id='build_dim_ip_table',
+#     python_callable = GetLocations,
+#     dag=dag,
+# )
+
+
+create_directory_task >> clean_raw_data_task >> build_fact_1_task >> [extract_date_task, extract_ip_task]
+
+unique_ip_task.set_upstream(task_or_task_list = extract_ip_task)
+unique_date_task.set_upstream(task_or_task_list = extract_date_task)
+
+build_dim_date_table_task.set_upstream(task_or_task_list = unique_date_task)
+
+
+
+# copyfact.set_upstream(task_or_task_list=[IPTable,BuildDimDate])
 # copyfact = BashOperator(
 #     task_id='copyfact',
 # #    bash_command=uniqDateCommand,
@@ -293,26 +300,3 @@ unique_date_task = BashOperator(
 
 #     dag=dag,
 # )
- 
-  
-# download_data >> BuildFact1 >>DimIp>>DateTable>>uniq>>uniq2>>BuildDimDate>>IPTable
-# BuildFact1.set_upstream(task_or_task_list=[download_data])
-# DimIp.set_upstream(task_or_task_list=[BuildFact1])
-# DateTable.set_upstream(task_or_task_list=[BuildFact1])
-# uniq2.set_upstream(task_or_task_list=[DateTable])
-# uniq.set_upstream(task_or_task_list=[DimIp])
-#clean_raw_data.set_upstream(task_or_task_list=[create_dir])
-
-create_directory_task >> clean_raw_data_task >> build_fact_1_task >> [build_dim_ip_task, build_dim_date_task]
-
-unique_ip_task.set_upstream(task_or_task_list=build_dim_ip_task)
-unique_date_task.set_upstream(task_or_task_list=build_dim_date_task)
-
-build_dim_date_table_task.set_upstream(task_or_task_list=unique_date_task)
-
-
-
-
-# BuildDimDate.set_upstream(task_or_task_list=[uniq2])
-# IPTable.set_upstream(task_or_task_list=[uniq])
-# copyfact.set_upstream(task_or_task_list=[IPTable,BuildDimDate])
