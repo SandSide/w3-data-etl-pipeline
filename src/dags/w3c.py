@@ -292,21 +292,16 @@ build_dim_ip_loc_table_task = PythonOperator(
     dag = dag,
 )
 
+copy_fact_table_task = BashOperator(
+    task_id = 'copy_fact_table',
+    bash_command = 'cp ' + STAGING + 'out-fact-1.txt ' + STAR_SCHEMA + 'fact_table.txt ',
+    dag = dag,
+)
 
-create_directory_task >> clean_raw_data_task >> build_fact_1_task >> [extract_date_task, extract_ip_task]
+create_directory_task >> clean_raw_data_task >> build_fact_1_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
 
 unique_ip_task.set_upstream(task_or_task_list = extract_ip_task)
 unique_date_task.set_upstream(task_or_task_list = extract_date_task)
 
 build_dim_date_table_task.set_upstream(task_or_task_list = unique_date_task)
 build_dim_ip_loc_table_task.set_upstream(task_or_task_list = unique_ip_task)
-
-
-# copyfact.set_upstream(task_or_task_list=[IPTable,BuildDimDate])
-# copyfact = BashOperator(
-#     task_id='copyfact',
-# #    bash_command=uniqDateCommand,
-#      bash_command='cp /home/airflow/gcs/data/Staging/OutFact1.txt /home/airflow/gcs/data/StarSchema/OutFact1.txt',
-
-#     dag=dag,
-# )
