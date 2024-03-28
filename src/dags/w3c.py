@@ -180,43 +180,53 @@ def build_dim_date_table():
             logging.error('Error with creating Date table')
            
             
-# def GetLocations():
-#     DimTablename=StarSchema+'DimIPLoc.txt'
-#     try:
-#         file_stats = os.stat(DimTablename)
+def build_dim_ip_loc_table():
     
-#         if (file_stats.st_size >2):
-#            print('Dim IP Table Exists')
-#            return
-#     except:
-#         print('Dim Table IP does not exist, creating one')
-#     InFile=open(Staging+'DimIPUniq.txt', 'r')
-#     OutFile=open(StarSchema+'DimIPLoc.txt', 'w')
+    table_name = STAR_SCHEMA + 'dim-ip-loc-table.txt'
     
+    # Dont call api if we dont have to
+    try:
+        file_stats = os.stat(table_name)
     
-#     Lines= InFile.readlines()
-#     for line in Lines:
-#         line=line.replace('\n','')
-#         # URL to send the request to
-#         request_url = 'https://geolocation-db.com/jsonp/' + line
-# #         print (request_url)
-#         # Send request and decode the result
-#         try:
-#             response = requests.get(request_url)
-#             result = response.content.decode()
-#         except:
-#             print ('error reponse'+result)
-#         try:
-#         # Clean the returned string so it just contains the dictionary data for the IP address
-#             result = result.split('(')[1].strip(')')
-#         # Convert this data into a dictionary
-#             result  = json.loads(result)
-#             out=line+','+str(result['country_code'])+','+str(result['country_name'])+','+str(result['city'])+','+str(result['latitude'])+','+str(result['longitude'])+'\n'
-# #            print(out)
-#             with open(StarSchema+'DimIPLoc.txt', 'a') as file:
-#                file.write(out)
-#         except:
-#             print ('error getting location')
+        if (file_stats.st_size >2):
+           logging.info('Dim IP Loc Table already exists')
+           return
+    except:
+        logging.exception('Dim IP Loc Table does not exist, creating one')
+
+
+
+    in_file = open(STAGING + 'dim-ip-uniq.txt', 'r')
+     
+    lines = in_file.readlines()
+    
+    for line in lines:
+        
+        line = line.replace('\n','')
+        
+        # URL to send the request to
+        request_url = 'https://geolocation-db.com/jsonp/' + line
+
+        # Send request and decode the result
+        try:
+            response = requests.get(request_url)
+            result = response.content.decode()
+        except:
+            logging.exception('error response ' + result)
+            
+        try:
+            # Clean the returned string so it just contains the dictionary data for the IP address
+            result = result.split('(')[1].strip(')')
+            
+            # Convert this data into a dictionary
+            result  = json.loads(result)
+            
+            out = line + ',' + str(result['country_code'] ) + ',' + str(result['country_name']) + ',' + str(result['city'] ) +',' + str(result['latitude']) + ',' + str(result['longitude']) + '\n'
+
+            with open(STAR_SCHEMA + 'dim-ip-loc-table.txt', 'a') as file:
+               file.write(out)
+        except:
+            logging.exception('error getting location')
 
 
 dag = DAG(                                                     
@@ -276,11 +286,11 @@ build_dim_date_table_task = PythonOperator(
    dag = dag,
 )
 
-# build_dim_ip_table_task = PythonOperator(
-#     task_id='build_dim_ip_table',
-#     python_callable = GetLocations,
-#     dag=dag,
-# )
+build_dim_ip_loc_table_task = PythonOperator(
+    task_id='build_dim_ip_table',
+    python_callable = build_dim_ip_loc_table,
+    dag = dag,
+)
 
 
 create_directory_task >> clean_raw_data_task >> build_fact_1_task >> [extract_date_task, extract_ip_task]
@@ -289,7 +299,7 @@ unique_ip_task.set_upstream(task_or_task_list = extract_ip_task)
 unique_date_task.set_upstream(task_or_task_list = extract_date_task)
 
 build_dim_date_table_task.set_upstream(task_or_task_list = unique_date_task)
-
+build_dim_ip_loc_table_task.set_upstream(task_or_task_list = unique_ip_task)
 
 
 # copyfact.set_upstream(task_or_task_list=[IPTable,BuildDimDate])
