@@ -61,73 +61,77 @@ def clean_hash(filename):
     
     if (type == 'log'):
     
-        OutputFileShort = open(STAGING + 'output-short.txt', 'a')
-        OutputFileLong = open(STAGING + 'output-long.txt', 'a')
+        out_file_Short = open(STAGING + 'data-short.txt', 'a')
+        out_file_Long = open(STAGING + 'data-long.txt', 'a')
 
-        InFile = open(RAW_DATA + filename, 'r')
+        in_file = open(RAW_DATA + filename, 'r')
     
-        Lines= InFile.readlines()
+        lines= in_file.readlines()
         
-        for line in Lines:
+        for line in lines:
             if (line[0] != '#'):
                 
-                Split = line.split(' ')
+                split = line.split(' ')
                 
-                if (len(Split) == 14):
-                    OutputFileShort.write(line)
-                    logging.debug('Short ', filename, len(Split))
+                if (len(split) == 14):
+                    out_file_Short.write(line)
+                    logging.debug('Short ', filename, len(split))
                 else:
-                    if (len(Split) == 18):
-                        OutputFileLong.write(line)
-                        logging.debug('Long ', filename, len(Split))
+                    if (len(split) == 18):
+                        out_file_Long.write(line)
+                        logging.debug('Long ', filename, len(split))
                     else:
-                        logging.debug('Fault ' + str(len(Split)))
+                        logging.debug('Fault ' + str(len(split)))
     
     
 def clear_files():
-    OutputFileShort = open(STAGING + 'output-short.txt', 'w')
-    OutputFileLong = open(STAGING + 'output-long.txt', 'w')
+    OutputFileShort = open(STAGING + 'data-short.txt', 'w')
+    OutputFileLong = open(STAGING + 'data-long.txt', 'w')
    
     
-def build_fact_1():
-    with open(STAGING + 'out-fact-1.txt', 'w') as file:
+def merge_data_sources():
+    with open(STAGING + 'merged-data.txt', 'w') as file:
         file.write('Date,Time,Browser,IP,ResponseTime\n')
         
-    build_fact_short()
-    build_fact_long()
+    merge_short()
+    merge_long()
  
        
-def build_fact_short():
-    InFile = open(STAGING + 'output-short.txt','r')
-    OutFact1 = open(STAGING + 'out-fact-1.txt', 'a')
+def merge_short():
+    in_file = open(STAGING + 'data-short.txt','r')
+    out_file = open(STAGING + 'merged-data.txt', 'a')
 
-    Lines = InFile.readlines()
+    lines = in_file.readlines()
     
-    for line in Lines:
-        Split = line.split(' ')
-        Browser = Split[9].replace(',','')
-        Out = Split[0] + ',' + Split[1] + ',' + Browser + ',' + Split[8] + ',' + Split[13]
-
-        OutFact1.write(Out)
-
-
-def build_fact_long():
-    InFile = open(STAGING + 'output-long.txt', 'r')
-    OutFact1 = open(STAGING + 'out-fact-1.txt', 'a')
-
-    Lines = InFile.readlines()
-    
-    for line in Lines:
-        Split=line.split(' ')
-        Browser=Split[9].replace(',','')
-        Out = Split[0] + ',' + Split[1] + ',' + Browser + ',' + Split[8] + ',' + Split[16]
+    for line in lines:
         
-        OutFact1.write(Out)
+        split = line.split(' ')
+        
+        browser = split[9].replace(',','')
+        out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[13]
+
+        out_file.write(out)
+
+
+def merge_long():
+    in_file = open(STAGING + 'data-long.txt', 'r')
+    out_file = open(STAGING + 'merged-data.txt', 'a')
+
+    lines = in_file.readlines()
+    
+    for line in lines:
+        
+        split = line.split(' ')
+        browser = split[9].replace(',','')
+        
+        out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[16]
+        
+        out_file.write(out)
  
 def extract_ip():
     
-    in_file = open(STAGING + 'out-fact-1.txt', 'r')
-    output_file = open(STAGING + 'dim-ip.txt', 'w')
+    in_file = open(STAGING + 'merged-data.txt', 'r')
+    out_file = open(STAGING + 'dim-ip.txt', 'w')
     
     lines= in_file.readlines()
     
@@ -135,11 +139,11 @@ def extract_ip():
         
         split = line.split(',')
         out = split[3] + '\n'
-        output_file.write(out)
+        out_file.write(out)
 
 def extract_date():
     
-    in_file = open(STAGING + 'out-fact-1.txt', 'r')
+    in_file = open(STAGING + 'merged-data.txt', 'r')
     out_file = open(STAGING + 'dim-date.txt', 'w')
 
     lines = in_file.readlines()
@@ -250,9 +254,9 @@ clean_raw_data_task = PythonOperator(
    dag = dag,
 )
 
-build_fact_1_task = PythonOperator(
-    task_id = 'build_fact_1',
-    python_callable = build_fact_1,
+merge_data_sources_task = PythonOperator(
+    task_id = 'merge_data_sources',
+    python_callable = merge_data_sources,
     dag = dag, 
 )
 
@@ -294,11 +298,11 @@ build_dim_ip_loc_table_task = PythonOperator(
 
 copy_fact_table_task = BashOperator(
     task_id = 'copy_fact_table',
-    bash_command = 'cp ' + STAGING + 'out-fact-1.txt ' + STAR_SCHEMA + 'fact_table.txt ',
+    bash_command = 'cp ' + STAGING + 'merged-data.txt ' + STAR_SCHEMA + 'fact_table.txt ',
     dag = dag,
 )
 
-create_directory_task >> clean_raw_data_task >> build_fact_1_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
+create_directory_task >> clean_raw_data_task >> merge_data_sources_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
 
 unique_ip_task.set_upstream(task_or_task_list = extract_ip_task)
 unique_date_task.set_upstream(task_or_task_list = extract_date_task)
