@@ -61,8 +61,8 @@ def clean_hash(filename):
     
     if (type == 'log'):
     
-        out_file_Short = open(STAGING + 'data-short.txt', 'a')
-        out_file_Long = open(STAGING + 'data-long.txt', 'a')
+        out_file_short = open(STAGING + 'data-short.txt', 'a')
+        out_file_long = open(STAGING + 'data-long.txt', 'a')
 
         in_file = open(RAW_DATA + filename, 'r')
     
@@ -74,19 +74,18 @@ def clean_hash(filename):
                 split = line.split(' ')
                 
                 if (len(split) == 14):
-                    out_file_Short.write(line)
+                    out_file_short.write(line)
                     logging.debug('Short ', filename, len(split))
+                elif (len(split) == 18):
+                    out_file_long.write(line)
+                    logging.debug('Long ', filename, len(split))
                 else:
-                    if (len(split) == 18):
-                        out_file_Long.write(line)
-                        logging.debug('Long ', filename, len(split))
-                    else:
-                        logging.debug('Fault ' + str(len(split)))
+                    logging.debug('Fault ' + str(len(split)))
     
     
 def clear_files():
-    OutputFileShort = open(STAGING + 'data-short.txt', 'w')
-    OutputFileLong = open(STAGING + 'data-long.txt', 'w')
+    out_file_short = open(STAGING + 'data-short.txt', 'w')
+    out_file_long = open(STAGING + 'data-long.txt', 'w')
    
     
 def merge_data_sources():
@@ -127,6 +126,7 @@ def merge_long():
         out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[16]
         
         out_file.write(out)
+
  
 def extract_ip():
     
