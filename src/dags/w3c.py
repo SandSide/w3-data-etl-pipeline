@@ -38,24 +38,24 @@ def create_directory():
     print('Finished creating directories')
 
 
-def clean_raw_data():
+def process_raw_data():
    
-   arr=os.listdir(RAW_DATA)
+    arr = os.listdir(RAW_DATA)
    
-   if not arr:
-      print('Raw data folder is empty')
+    if not arr:
+        print('Raw data folder is empty')
 
-   logging.debug('Raw file list:' + ','.join(str(element) for element in arr)) 
-   
-   clear_files()
-   
-   for f in arr:
-       clean_hash(f)
-
-
-def clean_hash(filename):
+    logging.debug('Raw file list:' + ','.join(str(element) for element in arr)) 
     
-    logging.debug('Cleaning ' + filename)
+    clear_files()
+    
+    for f in arr:
+        process_log_file(f)
+       
+
+def process_log_file(filename):
+    
+    logging.debug('Processing ' + filename)
     
     type = filename[-3:len(filename)]
     
@@ -86,7 +86,7 @@ def clean_hash(filename):
 def clear_files():
     out_file_short = open(STAGING + 'data-short.txt', 'w')
     out_file_long = open(STAGING + 'data-long.txt', 'w')
-   
+    
     
 def merge_data_sources():
     with open(STAGING + 'merged-data.txt', 'w') as file:
@@ -248,9 +248,9 @@ create_directory_task = PythonOperator(
 )
 
 
-clean_raw_data_task = PythonOperator(
-   task_id = 'clean_raw_data',
-   python_callable = clean_raw_data, 
+process_raw_data_task = PythonOperator(
+   task_id = 'process_raw_data',
+   python_callable = process_raw_data, 
    dag = dag,
 )
 
@@ -302,7 +302,7 @@ copy_fact_table_task = BashOperator(
     dag = dag,
 )
 
-create_directory_task >> clean_raw_data_task >> merge_data_sources_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
+create_directory_task >> process_raw_data_task >> merge_data_sources_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
 
 unique_ip_task.set_upstream(task_or_task_list = extract_ip_task)
 unique_date_task.set_upstream(task_or_task_list = extract_date_task)
