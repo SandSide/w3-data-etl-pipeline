@@ -19,7 +19,21 @@ RAW_DATA = BASE_DIR + '/W3SVC1/'
 STAGING = BASE_DIR + '/staging/'
 STAR_SCHEMA = BASE_DIR + '/star-schema/'
 
-ROBOTS = ['YandexBot', 'Googlebot', 'Baiduspider', '/robots.txt']
+ROBOTS = [
+    'YandexBot', 
+    'Googlebot', 
+    'Baiduspider', 
+    'DotBot',
+    'Slurp', 
+    'msnbot',
+    'MLBot',
+    'yacybot',
+    '/robots.txt', 
+    'robot',
+    'Robot',
+    'Bot',
+    'bot'
+]
 
 
 def create_directory():
