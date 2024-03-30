@@ -3,3 +3,4 @@
 /src/dags/__pycache__
 /src/data/staging
 /src/data/star-schema
+/src/logs/dag_processor_manager
