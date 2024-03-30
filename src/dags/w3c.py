@@ -1,17 +1,23 @@
-import datetime as dt
-import csv
 import airflow
-import requests
-import os
-from datetime import datetime
-import requests.exceptions as requests_exceptions
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
-import requests
-import json
-import mysql.connector
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+
+
+import datetime as dt
+
+import os
+import csv
+from datetime import datetime
 import logging
+
+import json
+import requests
+import requests.exceptions as requests_exceptions
+
+
+
 
 # Global variables
 BASE_DIR = '/opt/airflow/data'
@@ -255,79 +261,70 @@ def build_dim_ip_loc_table():
             logging.exception('error getting location')
 
 
-dag = DAG(                                                     
-   dag_id = 'Process_W3_Data',                          
-   schedule_interval = '@daily',                                     
-   start_date = dt.datetime(2023, 2, 24), 
-   catchup = False,
-)
+with DAG(
+    dag_id = 'Process_W3_Data',                          
+    schedule_interval = '@daily',                                     
+    start_date = dt.datetime(2023, 2, 24), 
+    catchup = False,
+) as dag:
 
 
-create_directory_task = PythonOperator(
-    task_id = 'create_directories',
-    python_callable = create_directory,
-    dag = dag,
-)
+    create_directory_task = PythonOperator(
+        task_id = 'create_directories',
+        python_callable = create_directory,
+        
+    )
 
 
-process_raw_data_task = PythonOperator(
-   task_id = 'process_raw_data',
-   python_callable = process_raw_data, 
-   dag = dag,
-)
+    process_raw_data_task = PythonOperator(
+        task_id = 'process_raw_data',
+        python_callable = process_raw_data, 
+    )
 
-merge_data_sources_task = PythonOperator(
-    task_id = 'merge_data_sources',
-    python_callable = merge_data_sources,
-    dag = dag, 
-)
+    merge_data_sources_task = PythonOperator(
+        task_id = 'merge_data_sources',
+        python_callable = merge_data_sources, 
+    )
 
-extract_ip_task = PythonOperator(
-    task_id = 'extract_ip',
-    python_callable = extract_ip,
-    dag = dag,
-)
+    extract_ip_task = PythonOperator(
+        task_id = 'extract_ip',
+        python_callable = extract_ip,    
+    )
 
-extract_date_task = PythonOperator(
-    task_id = 'extract_date',
-    python_callable = extract_date,
-    dag = dag,
-)
+    extract_date_task = PythonOperator(
+        task_id = 'extract_date',
+        python_callable = extract_date,   
+    )
 
-unique_ip_task = BashOperator(
-    task_id = 'unique_ip',
-    bash_command = 'sort -u ' + STAGING + 'dim-ip.txt > ' + STAGING + 'dim-ip-uniq.txt',
-    dag = dag,
-)
+    unique_ip_task = BashOperator(
+        task_id = 'unique_ip',
+        bash_command = 'sort -u ' + STAGING + 'dim-ip.txt > ' + STAGING + 'dim-ip-uniq.txt',     
+    )
 
-unique_date_task = BashOperator(
-    task_id = 'unique_date',
-    bash_command = 'sort -u ' + STAGING + 'dim-date.txt > ' + STAGING + 'dim-date-uniq.txt',
-    dag = dag,
-)
+    unique_date_task = BashOperator(
+        task_id = 'unique_date',
+        bash_command = 'sort -u ' + STAGING + 'dim-date.txt > ' + STAGING + 'dim-date-uniq.txt',    
+    )
 
-build_dim_date_table_task = PythonOperator(
-   task_id = 'build_dim_date_table',
-   python_callable = build_dim_date_table, 
-   dag = dag,
-)
+    build_dim_date_table_task = PythonOperator(
+        task_id = 'build_dim_date_table',
+        python_callable = build_dim_date_table, 
+    )
 
-build_dim_ip_loc_table_task = PythonOperator(
-    task_id='build_dim_ip_table',
-    python_callable = build_dim_ip_loc_table,
-    dag = dag,
-)
+    build_dim_ip_loc_table_task = PythonOperator(
+        task_id='build_dim_ip_table',
+        python_callable = build_dim_ip_loc_table,
+    )
 
-copy_fact_table_task = BashOperator(
-    task_id = 'copy_fact_table',
-    bash_command = 'cp ' + STAGING + 'merged-data.txt ' + STAR_SCHEMA + 'fact_table.txt ',
-    dag = dag,
-)
+    copy_fact_table_task = BashOperator(
+        task_id = 'copy_fact_table',
+        bash_command = 'cp ' + STAGING + 'merged-data.txt ' + STAR_SCHEMA + 'fact_table.txt ',
+    )
 
-create_directory_task >> process_raw_data_task >> merge_data_sources_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
+    create_directory_task >> process_raw_data_task >> merge_data_sources_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
 
-unique_ip_task.set_upstream(task_or_task_list = extract_ip_task)
-unique_date_task.set_upstream(task_or_task_list = extract_date_task)
+    unique_ip_task.set_upstream(task_or_task_list = extract_ip_task)
+    unique_date_task.set_upstream(task_or_task_list = extract_date_task)
 
-build_dim_date_table_task.set_upstream(task_or_task_list = unique_date_task)
-build_dim_ip_loc_table_task.set_upstream(task_or_task_list = unique_ip_task)
+    build_dim_date_table_task.set_upstream(task_or_task_list = unique_date_task)
+    build_dim_ip_loc_table_task.set_upstream(task_or_task_list = unique_ip_task)
