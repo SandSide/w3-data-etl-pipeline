@@ -13,14 +13,15 @@ import json
 import mysql.connector
 import logging
 
-
 # Global variables
 BASE_DIR = '/opt/airflow/data'
 RAW_DATA = BASE_DIR + '/W3SVC1/'
 STAGING = BASE_DIR + '/staging/'
 STAR_SCHEMA = BASE_DIR + '/star-schema/'
 
-   
+ROBOTS = ['YandexBot', 'Googlebot', 'Baiduspider', '/robots.txt']
+
+
 def create_directory():
     
     print('Creating directories')
@@ -63,7 +64,8 @@ def process_log_file(filename):
     
         out_file_short = open(STAGING + 'data-short.txt', 'a')
         out_file_long = open(STAGING + 'data-long.txt', 'a')
-
+        out_file_robot = open(STAGING + 'data-robot.txt', 'a')
+        
         in_file = open(RAW_DATA + filename, 'r')
     
         lines= in_file.readlines()
@@ -71,16 +73,22 @@ def process_log_file(filename):
         for line in lines:
             if (line[0] != '#'):
                 
-                split = line.split(' ')
+        
+                if not any(robot in line for robot in ROBOTS):
                 
-                if (len(split) == 14):
-                    out_file_short.write(line)
-                    logging.debug('Short ', filename, len(split))
-                elif (len(split) == 18):
-                    out_file_long.write(line)
-                    logging.debug('Long ', filename, len(split))
+                    split = line.split(' ')
+                    
+                    if (len(split) == 14):
+                        out_file_short.write(line)
+                        logging.debug('Short ', filename, len(split))
+                    elif (len(split) == 18):
+                        out_file_long.write(line)
+                        logging.debug('Long ', filename, len(split))
+                    else:
+                        logging.debug('Fault ' + str(len(split)))
                 else:
-                    logging.debug('Fault ' + str(len(split)))
+                    logging.debug('Robot ')
+                    out_file_robot.write(line)
     
     
 def clear_files():
