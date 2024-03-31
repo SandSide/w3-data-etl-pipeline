@@ -153,32 +153,18 @@ def clear_files():
     
     
 def insert_staging_log_data():
-    conn = get_db_connection()
     
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     with open(STAGING + 'merged-data.txt', 'r') as file:
         for line in file:
             values = line.strip().split(',')
-            cursor.execute("INSERT INTO staging_log_data (date, time, browser, ip, response_time) VALUES (%s, %s, %s, %s, %s)", values)
+            cursor.execute('INSERT INTO staging_log_data (date, time, browser, ip, response_time) VALUES (%s, %s, %s, %s, %s)', values)
             
     conn.commit()
     cursor.close()
     conn.close()
-    
-    
-def extract_ip():
-    
-    in_file = open(STAGING + 'merged-data.txt', 'r')
-    out_file = open(STAGING + 'dim-ip.txt', 'w')
-    
-    lines= in_file.readlines()
-    
-    for line in lines:
-        
-        split = line.split(',')
-        out = split[3] + '\n'
-        out_file.write(out)
 
 def extract_date():
     
@@ -305,7 +291,22 @@ with DAG(
         task_id = 'insert_log_data',
         python_callable = insert_staging_log_data,
     )
-    
+
+    extract_unique_ip_task = PostgresOperator(
+        task_id = 'extract_unique_ip_table',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS staging_ip;
+            
+            CREATE TABLE staging_ip (
+                ip_id SERIAL PRIMARY KEY,
+                ip VARCHAR
+            );
+            
+            INSERT INTO staging_ip (ip)
+            SELECT DISTINCT ip from staging_log_data;
+        '''
+    )
 
     # merge_data_sources_task = PythonOperator(
     #     task_id = 'merge_data_sources',
@@ -347,7 +348,7 @@ with DAG(
     #     bash_command = 'cp ' + STAGING + 'merged-data.txt ' + STAR_SCHEMA + 'fact_table.txt ',
     # )
 
-    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task
+    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> extract_unique_ip_task
     
     #>> #merge_data_sources_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
 
