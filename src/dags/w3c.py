@@ -3,8 +3,11 @@ from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+from airflow.providers.postgres.operators.postgres import PostgresOperator
+from sqlalchemy import create_engine
 
-
+from airflow.models import Connection
+import psycopg2
 import datetime as dt
 
 import os
@@ -17,6 +20,7 @@ import requests
 import requests.exceptions as requests_exceptions
 
 
+DB = ENV_ID = os.environ.get("AIRFLOW__DATABASE__SQL_ALCHEMY_CONN")
 
 
 # Global variables
@@ -40,6 +44,17 @@ ROBOTS = [
     'Bot',
     'bot'
 ]
+
+
+def get_db_connection():
+    conn = psycopg2.connect(
+        dbname='airflow',
+        user='airflow',
+        password='airflow',
+        host='postgres',
+        port='5432'
+    )
+    return conn
 
 
 def create_directory():
@@ -81,81 +96,77 @@ def process_log_file(filename):
     type = filename[-3:len(filename)]
     
     if (type == 'log'):
-    
-        out_file_short = open(STAGING + 'data-short.txt', 'a')
-        out_file_long = open(STAGING + 'data-long.txt', 'a')
-        out_file_robot = open(STAGING + 'data-robot.txt', 'a')
         
         in_file = open(RAW_DATA + filename, 'r')
-    
-        lines= in_file.readlines()
+        out_file_robot = open(STAGING + 'data-robot.txt', 'a')
+        out_file = open(STAGING + 'merged-data.txt', 'a')
+        
+        lines = in_file.readlines()
         
         for line in lines:
+            
             if (line[0] != '#'):
-                
-        
-                if not any(robot in line for robot in ROBOTS):
-                
-                    split = line.split(' ')
-                    
-                    if (len(split) == 14):
-                        out_file_short.write(line)
-                        logging.debug('Short ', filename, len(split))
-                    elif (len(split) == 18):
-                        out_file_long.write(line)
-                        logging.debug('Long ', filename, len(split))
-                    else:
-                        logging.debug('Fault ' + str(len(split)))
+            
+                result = process_log_line(line)
+
+                if result:
+                    if not result.endswith('\n'):
+                        result += '\n'
+                    out_file.write(result)
                 else:
-                    logging.debug('Robot ')
                     out_file_robot.write(line)
+                
+        in_file.close()
+        out_file_robot.close()
+        out_file.close()
+                 
     
+def process_log_line(line):    
+    
+    if not any(robot in line for robot in ROBOTS):
+    
+        split = line.split(' ')
+        
+        logging.debug('Processing ', len(split))
+        
+        if (len(split) == 14):
+            browser = split[9].replace(',','')
+            out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[13]
+            return out
+            
+        elif (len(split) == 18):  
+            browser = split[9].replace(',','')
+            out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[16]
+            return out
+
+        else:
+            logging.debug('Fault line ' + str(len(split)))
+            return None
+            
+    else:
+        logging.debug('Robot')
+        return None
+
     
 def clear_files():
-    out_file_short = open(STAGING + 'data-short.txt', 'w')
-    out_file_long = open(STAGING + 'data-long.txt', 'w')
+    out_file_long = open(STAGING + 'merged-data.txt', 'w')
     
     
-def merge_data_sources():
-    with open(STAGING + 'merged-data.txt', 'w') as file:
-        file.write('Date,Time,Browser,IP,ResponseTime\n')
-        
-    merge_short()
-    merge_long()
- 
-       
-def merge_short():
-    in_file = open(STAGING + 'data-short.txt','r')
-    out_file = open(STAGING + 'merged-data.txt', 'a')
-
-    lines = in_file.readlines()
+def insert_staging_log_data():
+    conn = get_db_connection()
     
-    for line in lines:
-        
-        split = line.split(' ')
-        
-        browser = split[9].replace(',','')
-        out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[13]
-
-        out_file.write(out)
-
-
-def merge_long():
-    in_file = open(STAGING + 'data-long.txt', 'r')
-    out_file = open(STAGING + 'merged-data.txt', 'a')
-
-    lines = in_file.readlines()
+    cursor = conn.cursor()
     
-    for line in lines:
-        
-        split = line.split(' ')
-        browser = split[9].replace(',','')
-        
-        out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[16]
-        
-        out_file.write(out)
-
- 
+    with open(STAGING + 'merged-data.txt', 'r') as file:
+        for line in file:
+            values = line.strip().split(',')
+            cursor.execute("INSERT INTO staging_log_data (date, time, browser, ip, response_time) VALUES (%s, %s, %s, %s, %s)", values)
+            
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    
 def extract_ip():
     
     in_file = open(STAGING + 'merged-data.txt', 'r')
@@ -269,62 +280,88 @@ with DAG(
 ) as dag:
 
 
-    create_directory_task = PythonOperator(
-        task_id = 'create_directories',
-        python_callable = create_directory,
-        
-    )
-
-
-    process_raw_data_task = PythonOperator(
-        task_id = 'process_raw_data',
+    extract_raw_data_task = PythonOperator(
+        task_id = 'extract_log_data',
         python_callable = process_raw_data, 
     )
-
-    merge_data_sources_task = PythonOperator(
-        task_id = 'merge_data_sources',
-        python_callable = merge_data_sources, 
+    
+    
+    create_staging_log_data_table_task = PostgresOperator(
+        task_id = 'create_staging_log_data_table',
+        sql = f"""
+        DROP TABLE IF EXISTS staging_log_data;
+        
+        CREATE TABLE staging_log_data(
+            date VARCHAR,
+            time VARCHAR,
+            browser VARCHAR,
+            ip VARCHAR,
+            response_time int
+        );
+        """
     )
-
-    extract_ip_task = PythonOperator(
-        task_id = 'extract_ip',
-        python_callable = extract_ip,    
+    
+    insert_staging_log_data_task = PythonOperator(
+        task_id = 'insert_log_data',
+        python_callable = insert_staging_log_data,
     )
+    
 
-    extract_date_task = PythonOperator(
-        task_id = 'extract_date',
-        python_callable = extract_date,   
-    )
+    # merge_data_sources_task = PythonOperator(
+    #     task_id = 'merge_data_sources',
+    #     python_callable = merge_data_sources, 
+    # )
 
-    unique_ip_task = BashOperator(
-        task_id = 'unique_ip',
-        bash_command = 'sort -u ' + STAGING + 'dim-ip.txt > ' + STAGING + 'dim-ip-uniq.txt',     
-    )
+    # extract_ip_task = PythonOperator(
+    #     task_id = 'extract_ip',
+    #     python_callable = extract_ip,    
+    # )
 
-    unique_date_task = BashOperator(
-        task_id = 'unique_date',
-        bash_command = 'sort -u ' + STAGING + 'dim-date.txt > ' + STAGING + 'dim-date-uniq.txt',    
-    )
+    # extract_date_task = PythonOperator(
+    #     task_id = 'extract_date',
+    #     python_callable = extract_date,   
+    # )
 
-    build_dim_date_table_task = PythonOperator(
-        task_id = 'build_dim_date_table',
-        python_callable = build_dim_date_table, 
-    )
+    # unique_ip_task = BashOperator(
+    #     task_id = 'unique_ip',
+    #     bash_command = 'sort -u ' + STAGING + 'dim-ip.txt > ' + STAGING + 'dim-ip-uniq.txt',     
+    # )
 
-    build_dim_ip_loc_table_task = PythonOperator(
-        task_id='build_dim_ip_table',
-        python_callable = build_dim_ip_loc_table,
-    )
+    # unique_date_task = BashOperator(
+    #     task_id = 'unique_date',
+    #     bash_command = 'sort -u ' + STAGING + 'dim-date.txt > ' + STAGING + 'dim-date-uniq.txt',    
+    # )
 
-    copy_fact_table_task = BashOperator(
-        task_id = 'copy_fact_table',
-        bash_command = 'cp ' + STAGING + 'merged-data.txt ' + STAR_SCHEMA + 'fact_table.txt ',
-    )
+    # build_dim_date_table_task = PythonOperator(
+    #     task_id = 'build_dim_date_table',
+    #     python_callable = build_dim_date_table, 
+    # )
 
-    create_directory_task >> process_raw_data_task >> merge_data_sources_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
+    # build_dim_ip_loc_table_task = PythonOperator(
+    #     task_id='build_dim_ip_table',
+    #     python_callable = build_dim_ip_loc_table,
+    # )
 
-    unique_ip_task.set_upstream(task_or_task_list = extract_ip_task)
-    unique_date_task.set_upstream(task_or_task_list = extract_date_task)
+    # copy_fact_table_task = BashOperator(
+    #     task_id = 'copy_fact_table',
+    #     bash_command = 'cp ' + STAGING + 'merged-data.txt ' + STAR_SCHEMA + 'fact_table.txt ',
+    # )
 
-    build_dim_date_table_task.set_upstream(task_or_task_list = unique_date_task)
-    build_dim_ip_loc_table_task.set_upstream(task_or_task_list = unique_ip_task)
+    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task
+    
+    #>> #merge_data_sources_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
+
+    # unique_ip_task.set_upstream(task_or_task_list = extract_ip_task)
+    # unique_date_task.set_upstream(task_or_task_list = extract_date_task)
+
+    # build_dim_date_table_task.set_upstream(task_or_task_list = unique_date_task)
+    # build_dim_ip_loc_table_task.set_upstream(task_or_task_list = unique_ip_task)
+    
+    # test_db = PostgresOperator(
+    #     task_id = 'test',
+    #     sql = """
+    #         CREATE TABLE test (
+    #             name VARCHAR NOT NULL
+    #         )
+    #     """,
+    # )
