@@ -324,21 +324,6 @@ with DAG(
         '''
     )
 
-    # extract_date_task = PythonOperator(
-    #     task_id = 'extract_date',
-    #     python_callable = extract_date,   
-    # )
-
-    # unique_ip_task = BashOperator(
-    #     task_id = 'unique_ip',
-    #     bash_command = 'sort -u ' + STAGING + 'dim-ip.txt > ' + STAGING + 'dim-ip-uniq.txt',     
-    # )
-
-    # unique_date_task = BashOperator(
-    #     task_id = 'unique_date',
-    #     bash_command = 'sort -u ' + STAGING + 'dim-date.txt > ' + STAGING + 'dim-date-uniq.txt',    
-    # )
-
     # build_dim_date_table_task = PythonOperator(
     #     task_id = 'build_dim_date_table',
     #     python_callable = build_dim_date_table, 
@@ -358,20 +343,3 @@ with DAG(
     
     extract_unique_ip_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
     extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
-    
-    #>> #merge_data_sources_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
-
-    # unique_ip_task.set_upstream(task_or_task_list = extract_ip_task)
-    # unique_date_task.set_upstream(task_or_task_list = extract_date_task)
-
-    # build_dim_date_table_task.set_upstream(task_or_task_list = unique_date_task)
-    # build_dim_ip_loc_table_task.set_upstream(task_or_task_list = unique_ip_task)
-    
-    # test_db = PostgresOperator(
-    #     task_id = 'test',
-    #     sql = """
-    #         CREATE TABLE test (
-    #             name VARCHAR NOT NULL
-    #         )
-    #     """,
-    # )
