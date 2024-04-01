@@ -211,60 +211,87 @@ def extract_date_details(date):
         
         #out = str(date) + ',' + str(date.year) + ',' + str(date.month) + ',' + str(date.day) + ',' + weekday + '\n'  
         return (date.year, date.month, date.day, weekday)
-        return out
 
     except:
         logging.error('Error with extracting date details ' + date)
            
-
             
-def build_dim_ip_loc_table():
+def update_ip_with_location():
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
     
-    table_name = STAR_SCHEMA + 'dim-ip-loc-table.txt'
+    sql_query = '''
+        ALTER TABLE staging_ip
+        ADD COLUMN IF NOT EXISTS country_code VARCHAR,
+        ADD COLUMN IF NOT EXISTS country_name VARCHAR,
+        ADD COLUMN IF NOT EXISTS latitude FLOAT,
+        ADD COLUMN IF NOT EXISTS longitude FLOAT;
+    '''
+    cursor.execute(sql_query)
     
-    # Dont call api if we dont have to
+    
+    sql_query = """
+        SELECT ip
+        FROM staging_ip
+        WHERE country_code IS NULL OR country_name IS NULL OR latitude IS NULL OR longitude IS NULL;
+    """
+    cursor.execute(sql_query)
+    ips = cursor.fetchall()
+
+
+    ips = [x[0] for x in ips]
+    
+    print(ips)
+    
+    for ip in ips:
+        
+        logging.debug(f"Finding location IP: {ip}")
+        print(f"Finding location IP: {ip}")
+        result = get_ip_location(ip)
+        
+        if result is not None and result[0] != 'Not found':
+        
+            cursor.execute('''
+                UPDATE staging_ip
+                SET country_code = %s, country_name = %s, latitude = %s, longitude = %s
+                WHERE ip = %s;
+                ''', (*result, ip))
+        else:
+            logging.debug(f"Location information not found for IP: {ip}")
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+        
+        
+def get_ip_location(ip):
+    
+    # URL to send the request to
+    request_url = 'https://geolocation-db.com/jsonp/' + ip
+
+    # Send request and decode the result
     try:
-        file_stats = os.stat(table_name)
-    
-        if (file_stats.st_size >2):
-           logging.info('Dim IP Loc Table already exists')
-           return
+        response = requests.get(request_url)
+        result = response.content.decode()
     except:
-        logging.exception('Dim IP Loc Table does not exist, creating one')
-
-
-
-    in_file = open(STAGING + 'dim-ip-uniq.txt', 'r')
-     
-    lines = in_file.readlines()
+        logging.exception('error response ' + result)
+        return
+        
+        
+    try:
+        # Clean the returned string so it just contains the dictionary data for the IP address
+        result = result.split('(')[1].strip(')')
+        
+        # Convert this data into a dictionary
+        result  = json.loads(result)
+        
+        #out = line + ',' + str(result['country_code'] ) + ',' + str(result['country_name']) + ',' + str(result['city'] ) +',' + str(result['latitude']) + ',' + str(result['longitude']) + '\n'
+        return (result['country_code'], result['country_name'], result['latitude'], result['longitude'])
     
-    for line in lines:
-        
-        line = line.replace('\n','')
-        
-        # URL to send the request to
-        request_url = 'https://geolocation-db.com/jsonp/' + line
-
-        # Send request and decode the result
-        try:
-            response = requests.get(request_url)
-            result = response.content.decode()
-        except:
-            logging.exception('error response ' + result)
-            
-        try:
-            # Clean the returned string so it just contains the dictionary data for the IP address
-            result = result.split('(')[1].strip(')')
-            
-            # Convert this data into a dictionary
-            result  = json.loads(result)
-            
-            out = line + ',' + str(result['country_code'] ) + ',' + str(result['country_name']) + ',' + str(result['city'] ) +',' + str(result['latitude']) + ',' + str(result['longitude']) + '\n'
-
-            with open(STAR_SCHEMA + 'dim-ip-loc-table.txt', 'a') as file:
-               file.write(out)
-        except:
-            logging.exception('error getting location')
+    except:
+        logging.exception('error getting location')
 
 
 with DAG(
@@ -301,19 +328,30 @@ with DAG(
         python_callable = insert_staging_log_data,
     )
 
+
+    create_staging_ip_table_task = PostgresOperator(
+        task_id = 'create_staging_ip_table',
+        sql = 
+        '''
+            CREATE TABLE IF NOT EXISTS staging_ip(
+                ip_id SERIAL PRIMARY KEY,
+                ip VARCHAR
+            )
+        '''
+    )
+
     extract_unique_ip_task = PostgresOperator(
         task_id = 'extract_unique_ip',
         sql = 
-        '''
-            DROP TABLE IF EXISTS staging_ip;
-            
-            CREATE TABLE staging_ip (
-                ip_id SERIAL PRIMARY KEY,
-                ip VARCHAR
-            );
-            
+        '''        
             INSERT INTO staging_ip (ip)
-            SELECT DISTINCT ip from staging_log_data;
+            SELECT DISTINCT ip 
+            FROM staging_log_data
+            WHERE NOT EXISTS (
+                SELECT * 
+                FROM staging_ip 
+                WHERE staging_ip.ip = staging_log_data.ip
+            ); 
         '''
     )
     
@@ -337,6 +375,11 @@ with DAG(
         task_id = 'update_date_with_details',
         python_callable = update_date_with_details, 
     )
+    
+    update_ip_with_location_task = PythonOperator(
+        task_id = 'update_ip_with_location',
+        python_callable = update_ip_with_location, 
+    )
 
     # build_dim_date_table_task = PythonOperator(
     #     task_id = 'build_dim_date_table',
@@ -353,9 +396,11 @@ with DAG(
     #     bash_command = 'cp ' + STAGING + 'merged-data.txt ' + STAR_SCHEMA + 'fact_table.txt ',
     # )
 
-    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task
+    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> create_staging_ip_table_task
     
-    extract_unique_ip_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
+    
+    extract_unique_ip_task.set_upstream(task_or_task_list = create_staging_ip_table_task)
     extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
     
     update_date_with_details_task.set_upstream(task_or_task_list = extract_unique_date_task)
+    update_ip_with_location_task.set_upstream(task_or_task_list = extract_unique_ip_task)
