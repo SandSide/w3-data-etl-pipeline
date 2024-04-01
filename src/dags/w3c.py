@@ -135,32 +135,26 @@ def process_log_file(filename):
     
 def process_log_line(line):    
     
-    if not any(robot in line for robot in ROBOTS):
+    split = line.split(' ')
     
-        split = line.split(' ')
+    logging.debug('Processing ', len(split))
+    
+    if (len(split) == 14):
+        browser = split[9].replace(',','')
+        #browser = extract_browser(browser)
+        out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[13]
+        return out
         
-        logging.debug('Processing ', len(split))
-        
-        if (len(split) == 14):
-            browser = split[9].replace(',','')
-            browser = extract_browser(browser)
-            out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[13]
-            return out
-            
-        elif (len(split) == 18):  
-            browser = split[9].replace(',','')
-            browser = extract_browser(browser)
-            out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[16]
-            return out
+    elif (len(split) == 18):  
+        browser = split[9].replace(',','')
+        #browser = extract_browser(browser)
+        out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[16]
+        return out
 
-        else:
-            logging.debug('Fault line ' + str(len(split)))
-            return None
-            
     else:
-        logging.debug('Robot')
+        logging.debug('Fault line ' + str(len(split)))
         return None
-
+            
     
 def clear_files():
     out_file_long = open(STAGING + 'merged-data.txt', 'w')
@@ -211,6 +205,26 @@ def update_date_with_details():
     conn.commit()
     cursor.close()
     conn.close()
+    
+
+def remove_bot_log_data():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT log_id, browser FROM staging_log_data;')
+    logs = cursor.fetchall()
+    
+    for log in logs:
+        
+        log_id, browser = log
+
+        if is_bot(browser):
+            cursor.execute('DELETE FROM staging_log_data WHERE log_id = %s;', (log_id,))
+            logging.debug(f'Deleting log {str(log_id)} because {browser}')
+        
+    deleted_rows = cursor.rowcount
+    logging.debug(f'Number of bots deleted: {deleted_rows}')
+    
  
 
 def extract_date_details(date):
@@ -313,6 +327,11 @@ def extract_browser(string):
     return parsed_ua.browser.family
 
 
+def is_bot(string):
+    parsed_ua = parse(string)
+    return parsed_ua.is_bot
+
+
 with DAG(
     dag_id = 'Process_W3_Data',                          
     schedule_interval = '@daily',                                     
@@ -333,6 +352,7 @@ with DAG(
         DROP TABLE IF EXISTS staging_log_data;
         
         CREATE TABLE staging_log_data(
+            log_id SERIAL PRIMARY KEY,
             date VARCHAR,
             time VARCHAR,
             browser VARCHAR,
@@ -345,6 +365,11 @@ with DAG(
     insert_staging_log_data_task = PythonOperator(
         task_id = 'insert_log_data',
         python_callable = insert_staging_log_data,
+    )
+    
+    remove_staging_log_bot_data_task = PythonOperator(
+        task_id = 'remove_bot_log',
+        python_callable = remove_bot_log_data,
     )
 
 
@@ -479,17 +504,17 @@ with DAG(
         '''
     )
 
-    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task
+    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> remove_staging_log_bot_data_task
     
     # IP
-    insert_staging_log_data_task >> create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
+    remove_staging_log_bot_data_task >> create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
     # extract_unique_ip_task.set_upstream(task_or_task_list = create_staging_ip_table_task)
     # update_ip_with_location_task.set_upstream(task_or_task_list = extract_unique_ip_task)
     # build_dim_ip_table_task.set_upstream(task_or_task_list = update_ip_with_location_task)
     # update_staging_log_with_ip_dim_task.set_upstream(task_or_task_list = build_dim_ip_table_task)
     
     # DATE
-    insert_staging_log_data_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task >> update_staging_log_with_date_dim_task
+    remove_staging_log_bot_data_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task >> update_staging_log_with_date_dim_task
     # extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
     # update_date_with_details_task.set_upstream(task_or_task_list = extract_unique_date_task)
     # build_dim_date_table_task.set_upstream(task_or_task_list = update_date_with_details_task)
@@ -497,7 +522,7 @@ with DAG(
     
     
     # BROWSER
-    insert_staging_log_data_task >> extract_unique_browser_task
+    remove_staging_log_bot_data_task >> extract_unique_browser_task
     
     # FACT TABLE
     build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task])
