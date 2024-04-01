@@ -5,16 +5,24 @@ from airflow.operators.python import PythonOperator
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from airflow.providers.postgres.operators.postgres import PostgresOperator
 from sqlalchemy import create_engine
-
 from airflow.models import Connection
-import psycopg2
-import datetime as dt
 
 import os
 import csv
+import datetime as dt
 from datetime import datetime
-import logging
 
+
+# DODGY CODE
+import subprocess
+subprocess.call(['pip', 'install', 'user-agents'])
+from user_agents import parse
+
+
+import psycopg2
+
+
+import logging
 import json
 import requests
 import requests.exceptions as requests_exceptions
@@ -55,6 +63,10 @@ def get_db_connection():
         port='5432'
     )
     return conn
+
+
+# def install_dependencies():
+
 
 
 # def create_directory():
@@ -131,11 +143,13 @@ def process_log_line(line):
         
         if (len(split) == 14):
             browser = split[9].replace(',','')
+            browser = extract_browser(browser)
             out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[13]
             return out
             
         elif (len(split) == 18):  
             browser = split[9].replace(',','')
+            browser = extract_browser(browser)
             out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[16]
             return out
 
@@ -294,6 +308,11 @@ def get_ip_location(ip):
         logging.exception('error getting location')
 
 
+def extract_browser(string):
+    parsed_ua = parse(string)
+    return parsed_ua.browser.family
+
+
 with DAG(
     dag_id = 'Process_W3_Data',                          
     schedule_interval = '@daily',                                     
@@ -430,6 +449,24 @@ with DAG(
         '''
     )
 
+    ##### BROWSER TASKS ######
+    
+    extract_unique_browser_task = PostgresOperator(
+        task_id = 'extract_unique_browser',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS staging_browser;
+            
+            CREATE TABLE staging_browser (
+                browser_id SERIAL PRIMARY KEY,
+                browser VARCHAR
+            );
+            
+            INSERT INTO staging_browser (browser)
+            SELECT DISTINCT browser from staging_log_data;
+        '''
+    )
+
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
         task_id = 'build_fact_table',
@@ -442,10 +479,10 @@ with DAG(
         '''
     )
 
-    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> create_staging_ip_table_task
+    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task
     
     # IP
-    create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
+    insert_staging_log_data_task >> create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
     # extract_unique_ip_task.set_upstream(task_or_task_list = create_staging_ip_table_task)
     # update_ip_with_location_task.set_upstream(task_or_task_list = extract_unique_ip_task)
     # build_dim_ip_table_task.set_upstream(task_or_task_list = update_ip_with_location_task)
@@ -457,6 +494,10 @@ with DAG(
     # update_date_with_details_task.set_upstream(task_or_task_list = extract_unique_date_task)
     # build_dim_date_table_task.set_upstream(task_or_task_list = update_date_with_details_task)
     # update_staging_date_with_date_dim_task.set_upstream(task_or_task_list = buildbuild_dim_date_table_task_dim_ip_table_task)
+    
+    
+    # BROWSER
+    insert_staging_log_data_task >> extract_unique_browser_task
     
     # FACT TABLE
     build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task])
