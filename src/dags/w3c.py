@@ -57,21 +57,21 @@ def get_db_connection():
     return conn
 
 
-def create_directory():
+# def create_directory():
     
-    print('Creating directories')
+#     print('Creating directories')
         
-    try: 
-        os.mkdir(STAGING)
-    except FileExistsError:
-        print('Cant make staging dir') 
+#     try: 
+#         os.mkdir(STAGING)
+#     except FileExistsError:
+#         print('Cant make staging dir') 
     
-    try:
-        os.mkdir(STAR_SCHEMA)
-    except FileExistsError:
-        print('Cant make star schema dir') 
+#     try:
+#         os.mkdir(STAR_SCHEMA)
+#     except FileExistsError:
+#         print('Cant make star schema dir') 
         
-    print('Finished creating directories')
+#     print('Finished creating directories')
 
 
 def process_raw_data():
@@ -166,48 +166,57 @@ def insert_staging_log_data():
     cursor.close()
     conn.close()
 
-def extract_date():
-    
-    in_file = open(STAGING + 'merged-data.txt', 'r')
-    out_file = open(STAGING + 'dim-date.txt', 'w')
 
-    lines = in_file.readlines()
+
+def update_date_with_details():
+    conn = get_db_connection()
+    cursor = conn.cursor()
     
-    for line in lines:
-        split = line.split(',')
-        out = split[0] + '\n'
-        out_file.write(out)
+    cursor.execute('SELECT date FROM staging_date;')
+    dates = cursor.fetchall()
+    
+    dates = [x[0] for x in dates]
+    
+    cursor.execute('''
+        ALTER TABLE staging_date
+        ADD COLUMN year INT,
+        ADD COLUMN month INT,
+        ADD COLUMN day INT,
+        ADD COLUMN week_day VARCHAR;
+    ''')
+    
+    for date in dates:
+        result = extract_date_details(date)
+        
+        cursor.execute('''
+            UPDATE staging_date 
+            SET year  = %s, month = %s, day = %s, week_day = %s
+            WHERE date = %s;
+            ''', (*result, date))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
  
 
-DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+def extract_date_details(date):
+        
+    logging.debug('Extracting date details: ' + date)
+        
+    DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
+    
+    try:
+        date = datetime.strptime(date,'%Y-%m-%d').date()
+        weekday = DAYS[date.weekday()]
+        
+        #out = str(date) + ',' + str(date.year) + ',' + str(date.month) + ',' + str(date.day) + ',' + weekday + '\n'  
+        return (date.year, date.month, date.day, weekday)
+        return out
 
- 
-def build_dim_date_table():
-    
-    in_file = open(STAGING + 'dim-date-uniq.txt', 'r')   
-    out_file = open(STAR_SCHEMA + 'dim-date-table.txt', 'w')
-    
-    with out_file as file:
-       file.write('Date,Year,Month,Day,DayofWeek\n')
-       
-    lines = in_file.readlines()
-    
-    for line in lines:
-        
-        line = line.replace('\n','')
-        print(line)
-        
-        try:
-            date = datetime.strptime(line,'%Y-%m-%d').date()
-            weekday = DAYS[date.weekday()]
-            
-            out = str(date) + ',' + str(date.year) + ',' + str(date.month) + ',' + str(date.day) + ',' + weekday + '\n'
-            
-            with open(STAR_SCHEMA + 'dim-date-table.txt', 'a') as file:
-               file.write(out)
-        except:
-            logging.error('Error with creating Date table')
+    except:
+        logging.error('Error with extracting date details ' + date)
            
+
             
 def build_dim_ip_loc_table():
     
@@ -323,6 +332,11 @@ with DAG(
             SELECT DISTINCT date from staging_log_data;
         '''
     )
+    
+    update_date_with_details_task = PythonOperator(
+        task_id = 'update_date_with_details',
+        python_callable = update_date_with_details, 
+    )
 
     # build_dim_date_table_task = PythonOperator(
     #     task_id = 'build_dim_date_table',
@@ -343,3 +357,5 @@ with DAG(
     
     extract_unique_ip_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
     extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
+    
+    update_date_with_details_task.set_upstream(task_or_task_list = extract_unique_date_task)
