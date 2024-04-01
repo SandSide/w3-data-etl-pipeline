@@ -293,7 +293,7 @@ with DAG(
     )
 
     extract_unique_ip_task = PostgresOperator(
-        task_id = 'extract_unique_ip_table',
+        task_id = 'extract_unique_ip',
         sql = 
         '''
             DROP TABLE IF EXISTS staging_ip;
@@ -307,16 +307,22 @@ with DAG(
             SELECT DISTINCT ip from staging_log_data;
         '''
     )
-
-    # merge_data_sources_task = PythonOperator(
-    #     task_id = 'merge_data_sources',
-    #     python_callable = merge_data_sources, 
-    # )
-
-    # extract_ip_task = PythonOperator(
-    #     task_id = 'extract_ip',
-    #     python_callable = extract_ip,    
-    # )
+    
+    extract_unique_date_task = PostgresOperator(
+        task_id = 'extract_unique_date',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS staging_date;
+            
+            CREATE TABLE staging_date (
+                date_id SERIAL PRIMARY KEY,
+                date VARCHAR
+            );
+            
+            INSERT INTO staging_date (date)
+            SELECT DISTINCT date from staging_log_data;
+        '''
+    )
 
     # extract_date_task = PythonOperator(
     #     task_id = 'extract_date',
@@ -348,7 +354,10 @@ with DAG(
     #     bash_command = 'cp ' + STAGING + 'merged-data.txt ' + STAR_SCHEMA + 'fact_table.txt ',
     # )
 
-    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> extract_unique_ip_task
+    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task
+    
+    extract_unique_ip_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
+    extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
     
     #>> #merge_data_sources_task >> [extract_date_task, extract_ip_task, copy_fact_table_task]
 
