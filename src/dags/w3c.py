@@ -426,6 +426,16 @@ with DAG(
         '''
     )
 
+    build_fact_table_task = PostgresOperator(
+        task_id = 'build_fact_table',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS log_fact_table;
+            
+            CREATE TABLE log_fact_table AS
+            SELECT * FROM staging_log_data;
+        '''
+    )
 
     # copy_fact_table_task = BashOperator(
     #     task_id = 'copy_fact_table',
@@ -447,3 +457,6 @@ with DAG(
     # update_date_with_details_task.set_upstream(task_or_task_list = extract_unique_date_task)
     # build_dim_date_table_task.set_upstream(task_or_task_list = update_date_with_details_task)
     # update_staging_date_with_date_dim_task.set_upstream(task_or_task_list = buildbuild_dim_date_table_task_dim_ip_table_task)
+    
+    # FACT TABLE
+    build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task])
