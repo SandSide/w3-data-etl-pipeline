@@ -524,6 +524,17 @@ with DAG(
             SELECT DISTINCT browser from staging_log_data;
         '''
     )
+    
+    build_dim_browser_table_task = PostgresOperator(
+        task_id = 'build_dim_browser_table',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS dim_browser;
+            
+            CREATE TABLE dim_browser AS
+            SELECT * FROM staging_browser;
+        '''
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -555,7 +566,7 @@ with DAG(
     
     
     # BROWSER
-    remove_staging_log_bot_data_task >> determine_browser_task >> extract_unique_browser_task
+    remove_staging_log_bot_data_task >> determine_browser_task >> extract_unique_browser_task >> build_dim_browser_table_task
     
     # FACT TABLE
-    build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task])
+    build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task])
