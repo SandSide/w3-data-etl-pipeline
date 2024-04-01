@@ -403,6 +403,18 @@ with DAG(
             SELECT * FROM staging_date;
         '''
     )
+    
+    update_staging_log_with_ip_dim_task = PostgresOperator(
+        task_id = 'update_staging_log_with_ip_id',
+        sql = 
+        '''
+            UPDATE staging_log_data AS f
+            SET ip = dim.ip_id
+            FROM dim_ip AS dim
+            WHERE f.ip = dim.ip;
+        '''
+    )
+
 
     # copy_fact_table_task = BashOperator(
     #     task_id = 'copy_fact_table',
@@ -416,6 +428,7 @@ with DAG(
     extract_unique_ip_task.set_upstream(task_or_task_list = create_staging_ip_table_task)
     update_ip_with_location_task.set_upstream(task_or_task_list = extract_unique_ip_task)
     build_dim_ip_table_task.set_upstream(task_or_task_list = update_ip_with_location_task)
+    update_staging_log_with_ip_dim_task.set_upstream(task_or_task_list = build_dim_ip_table_task)
     
     # DATE
     extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
