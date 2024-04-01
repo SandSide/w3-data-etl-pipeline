@@ -329,6 +329,7 @@ with DAG(
     )
 
 
+    ###### IP TASKS ######
     create_staging_ip_table_task = PostgresOperator(
         task_id = 'create_staging_ip_table',
         sql = 
@@ -339,6 +340,7 @@ with DAG(
             )
         '''
     )
+
 
     extract_unique_ip_task = PostgresOperator(
         task_id = 'extract_unique_ip',
@@ -355,6 +357,36 @@ with DAG(
         '''
     )
     
+    update_ip_with_location_task = PythonOperator(
+        task_id = 'update_ip_with_location',
+        python_callable = update_ip_with_location, 
+    )
+    
+
+    build_dim_ip_table_task = PostgresOperator(
+        task_id = 'build_dim_ip_table',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS dim_ip;
+            
+            CREATE TABLE dim_ip AS
+            SELECT * FROM staging_ip;
+        '''
+    )
+    
+    
+    update_staging_log_with_ip_dim_task = PostgresOperator(
+        task_id = 'update_staging_log_with_ip_id',
+        sql = 
+        '''
+            UPDATE staging_log_data AS f
+            SET ip = dim.ip_id
+            FROM dim_ip AS dim
+            WHERE f.ip = dim.ip;
+        '''
+    )
+    
+    ###### DATE TASKS ######
     extract_unique_date_task = PostgresOperator(
         task_id = 'extract_unique_date',
         sql = 
@@ -376,23 +408,6 @@ with DAG(
         python_callable = update_date_with_details, 
     )
     
-    update_ip_with_location_task = PythonOperator(
-        task_id = 'update_ip_with_location',
-        python_callable = update_ip_with_location, 
-    )
-    
-
-    build_dim_ip_table_task = PostgresOperator(
-        task_id = 'build_dim_ip_table',
-        sql = 
-        '''
-            DROP TABLE IF EXISTS dim_ip;
-            
-            CREATE TABLE dim_ip AS
-            SELECT * FROM staging_ip;
-        '''
-    )
-    
     build_dim_date_table_task = PostgresOperator(
         task_id = 'build_dim_date_table',
         sql = 
@@ -403,18 +418,7 @@ with DAG(
             SELECT * FROM staging_date;
         '''
     )
-    
-    update_staging_log_with_ip_dim_task = PostgresOperator(
-        task_id = 'update_staging_log_with_ip_id',
-        sql = 
-        '''
-            UPDATE staging_log_data AS f
-            SET ip = dim.ip_id
-            FROM dim_ip AS dim
-            WHERE f.ip = dim.ip;
-        '''
-    )
-    
+        
     update_staging_log_with_date_dim_task = PostgresOperator(
         task_id = 'update_staging_log_with_date_id',
         sql = 
@@ -426,6 +430,7 @@ with DAG(
         '''
     )
 
+    ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
         task_id = 'build_fact_table',
         sql = 
@@ -436,11 +441,6 @@ with DAG(
             SELECT * FROM staging_log_data;
         '''
     )
-
-    # copy_fact_table_task = BashOperator(
-    #     task_id = 'copy_fact_table',
-    #     bash_command = 'cp ' + STAGING + 'merged-data.txt ' + STAR_SCHEMA + 'fact_table.txt ',
-    # )
 
     extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> create_staging_ip_table_task
     
