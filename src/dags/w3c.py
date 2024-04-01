@@ -28,8 +28,6 @@ import requests
 import requests.exceptions as requests_exceptions
 
 
-DB = ENV_ID = os.environ.get("AIRFLOW__DATABASE__SQL_ALCHEMY_CONN")
-
 
 # Global variables
 BASE_DIR = '/opt/airflow/data'
@@ -37,21 +35,6 @@ RAW_DATA = BASE_DIR + '/W3SVC1/'
 STAGING = BASE_DIR + '/staging/'
 STAR_SCHEMA = BASE_DIR + '/star-schema/'
 
-ROBOTS = [
-    'YandexBot', 
-    'Googlebot', 
-    'Baiduspider', 
-    'DotBot',
-    'Slurp', 
-    'msnbot',
-    'MLBot',
-    'yacybot',
-    '/robots.txt', 
-    'robot',
-    'Robot',
-    'Bot',
-    'bot'
-]
 
 
 def get_db_connection():
@@ -63,27 +46,6 @@ def get_db_connection():
         port='5432'
     )
     return conn
-
-
-# def install_dependencies():
-
-
-
-# def create_directory():
-    
-#     print('Creating directories')
-        
-#     try: 
-#         os.mkdir(STAGING)
-#     except FileExistsError:
-#         print('Cant make staging dir') 
-    
-#     try:
-#         os.mkdir(STAR_SCHEMA)
-#     except FileExistsError:
-#         print('Cant make star schema dir') 
-        
-#     print('Finished creating directories')
 
 
 def process_raw_data():
@@ -110,7 +72,7 @@ def process_log_file(filename):
     if (type == 'log'):
         
         in_file = open(RAW_DATA + filename, 'r')
-        out_file_robot = open(STAGING + 'data-robot.txt', 'a')
+        out_file_robot = open(STAGING + 'data-robot.txt', 'r')
         out_file = open(STAGING + 'merged-data.txt', 'a')
         
         lines = in_file.readlines()
@@ -168,7 +130,7 @@ def insert_staging_log_data():
     with open(STAGING + 'merged-data.txt', 'r') as file:
         for line in file:
             values = line.strip().split(',')
-            cursor.execute('INSERT INTO staging_log_data (date, time, browser, ip, response_time) VALUES (%s, %s, %s, %s, %s)', values)
+            cursor.execute('INSERT INTO staging_log_data (date, time, browser_string, ip, response_time) VALUES (%s, %s, %s, %s, %s)', values)
             
     conn.commit()
     cursor.close()
@@ -211,10 +173,10 @@ def remove_bot_log_data():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute('SELECT log_id, browser FROM staging_log_data;')
-    logs = cursor.fetchall()
+    cursor.execute('SELECT log_id, browser_string FROM staging_log_data;')
+    result = cursor.fetchall()
     
-    for log in logs:
+    for log in result:
         
         log_id, browser = log
 
@@ -225,7 +187,15 @@ def remove_bot_log_data():
     deleted_rows = cursor.rowcount
     logging.debug(f'Number of bots deleted: {deleted_rows}')
     
- 
+    conn.commit()
+    cursor.close()
+    conn.close()
+    
+    
+def is_bot(string):
+    parsed_ua = parse(string)
+    return parsed_ua.is_bot
+
 
 def extract_date_details(date):
         
@@ -322,15 +292,73 @@ def get_ip_location(ip):
         logging.exception('error getting location')
 
 
-def extract_browser(string):
-    parsed_ua = parse(string)
-    return parsed_ua.browser.family
+def determine_browser():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Add browser column
+    sql_query = '''
+        ALTER TABLE staging_log_data
+        ADD COLUMN IF NOT EXISTS browser VARCHAR;
+    '''
+    cursor.execute(sql_query)
+    
+    
+    cursor.execute('SELECT log_id, browser_string FROM staging_log_data;')
+    result = cursor.fetchall()
+    
+    for log in result:
+        
+        log_id, browser = log
+        
+        # Get details from browser string
+        parsed_ua = parse(browser)
+        browser = parsed_ua.browser.family
 
+        # Update table
+        cursor.execute('''
+            UPDATE staging_log_data 
+            SET browser = %s
+            WHERE log_id = %s;
+            ''', (browser, log_id))
+        
+    conn.commit()
+    cursor.close()
+    conn.close() 
 
-def is_bot(string):
-    parsed_ua = parse(string)
-    return parsed_ua.is_bot
+def determine_os():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Add os column
+    sql_query = '''
+        ALTER TABLE staging_log_data
+        ADD COLUMN IF NOT EXISTS os VARCHAR;
+    '''
+    cursor.execute(sql_query)
+    
+    
+    cursor.execute('SELECT log_id, browser_string FROM staging_log_data;')
+    result = cursor.fetchall()
+    
+    for log in result:
+        
+        log_id, browser = log
+        
+        # Get details from browser string
+        parsed_ua = parse(browser)
+        os = parsed_ua.os.family
 
+        # Update table
+        cursor.execute('''
+            UPDATE staging_log_data 
+            SET os = %s
+            WHERE log_id = %s;
+            ''', (os, log_id))
+        
+    conn.commit()
+    cursor.close()
+    conn.close()    
 
 with DAG(
     dag_id = 'Process_W3_Data',                          
@@ -355,7 +383,7 @@ with DAG(
             log_id SERIAL PRIMARY KEY,
             date VARCHAR,
             time VARCHAR,
-            browser VARCHAR,
+            browser_string VARCHAR,
             ip VARCHAR,
             response_time int
         );
@@ -476,6 +504,11 @@ with DAG(
 
     ##### BROWSER TASKS ######
     
+    determine_browser_task = PythonOperator(
+        task_id = 'determine_browser',
+        python_callable = determine_browser,
+    )
+    
     extract_unique_browser_task = PostgresOperator(
         task_id = 'extract_unique_browser',
         sql = 
@@ -522,7 +555,7 @@ with DAG(
     
     
     # BROWSER
-    remove_staging_log_bot_data_task >> extract_unique_browser_task
+    remove_staging_log_bot_data_task >> determine_browser_task >> extract_unique_browser_task
     
     # FACT TABLE
     build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task])
