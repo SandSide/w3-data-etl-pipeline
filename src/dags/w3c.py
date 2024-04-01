@@ -414,6 +414,17 @@ with DAG(
             WHERE f.ip = dim.ip;
         '''
     )
+    
+    update_staging_log_with_date_dim_task = PostgresOperator(
+        task_id = 'update_staging_log_with_date_id',
+        sql = 
+        '''
+            UPDATE staging_log_data AS f
+            SET date = dim.date_id
+            FROM dim_date AS dim
+            WHERE f.date = dim.date;
+        '''
+    )
 
 
     # copy_fact_table_task = BashOperator(
@@ -424,13 +435,15 @@ with DAG(
     extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> create_staging_ip_table_task
     
     # IP
-    #create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >>build_dim_ip_table_task
-    extract_unique_ip_task.set_upstream(task_or_task_list = create_staging_ip_table_task)
-    update_ip_with_location_task.set_upstream(task_or_task_list = extract_unique_ip_task)
-    build_dim_ip_table_task.set_upstream(task_or_task_list = update_ip_with_location_task)
-    update_staging_log_with_ip_dim_task.set_upstream(task_or_task_list = build_dim_ip_table_task)
+    create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
+    # extract_unique_ip_task.set_upstream(task_or_task_list = create_staging_ip_table_task)
+    # update_ip_with_location_task.set_upstream(task_or_task_list = extract_unique_ip_task)
+    # build_dim_ip_table_task.set_upstream(task_or_task_list = update_ip_with_location_task)
+    # update_staging_log_with_ip_dim_task.set_upstream(task_or_task_list = build_dim_ip_table_task)
     
     # DATE
-    extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
-    update_date_with_details_task.set_upstream(task_or_task_list = extract_unique_date_task)
-    build_dim_date_table_task.set_upstream(task_or_task_list = update_date_with_details_task)
+    insert_staging_log_data_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task >> update_staging_log_with_date_dim_task
+    # extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
+    # update_date_with_details_task.set_upstream(task_or_task_list = extract_unique_date_task)
+    # build_dim_date_table_task.set_upstream(task_or_task_list = update_date_with_details_task)
+    # update_staging_date_with_date_dim_task.set_upstream(task_or_task_list = buildbuild_dim_date_table_task_dim_ip_table_task)
