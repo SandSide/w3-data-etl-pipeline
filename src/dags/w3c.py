@@ -380,16 +380,29 @@ with DAG(
         task_id = 'update_ip_with_location',
         python_callable = update_ip_with_location, 
     )
+    
 
-    # build_dim_date_table_task = PythonOperator(
-    #     task_id = 'build_dim_date_table',
-    #     python_callable = build_dim_date_table, 
-    # )
-
-    # build_dim_ip_loc_table_task = PythonOperator(
-    #     task_id='build_dim_ip_table',
-    #     python_callable = build_dim_ip_loc_table,
-    # )
+    build_dim_ip_table_task = PostgresOperator(
+        task_id = 'build_dim_ip_table',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS dim_ip;
+            
+            CREATE TABLE dim_ip AS
+            SELECT * FROM staging_ip;
+        '''
+    )
+    
+    build_dim_date_table_task = PostgresOperator(
+        task_id = 'build_dim_date_table',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS dim_date;
+            
+            CREATE TABLE dim_date AS
+            SELECT * FROM staging_date;
+        '''
+    )
 
     # copy_fact_table_task = BashOperator(
     #     task_id = 'copy_fact_table',
@@ -398,9 +411,13 @@ with DAG(
 
     extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> create_staging_ip_table_task
     
-    
+    # IP
+    #create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >>build_dim_ip_table_task
     extract_unique_ip_task.set_upstream(task_or_task_list = create_staging_ip_table_task)
-    extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
-    
-    update_date_with_details_task.set_upstream(task_or_task_list = extract_unique_date_task)
     update_ip_with_location_task.set_upstream(task_or_task_list = extract_unique_ip_task)
+    build_dim_ip_table_task.set_upstream(task_or_task_list = update_ip_with_location_task)
+    
+    # DATE
+    extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
+    update_date_with_details_task.set_upstream(task_or_task_list = extract_unique_date_task)
+    build_dim_date_table_task.set_upstream(task_or_task_list = update_date_with_details_task)
