@@ -546,7 +546,22 @@ with DAG(
         python_callable = determine_os,
     )
     
-    
+    extract_unique_os_task = PostgresOperator(
+        task_id = 'extract_unique_os',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS staging_os;
+            
+            CREATE TABLE staging_os (
+                os_id SERIAL PRIMARY KEY,
+                os VARCHAR
+            );
+            
+            INSERT INTO staging_os (os)
+            SELECT DISTINCT os from staging_log_data;
+        '''
+    )
+        
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -582,7 +597,7 @@ with DAG(
     
     
     # OS
-    remove_staging_log_bot_data_task >> determine_os_task
+    remove_staging_log_bot_data_task >> determine_os_task >> extract_unique_os_task
     
     
     # FACT TABLE
