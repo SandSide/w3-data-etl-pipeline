@@ -104,13 +104,13 @@ def process_log_line(line):
     if (len(split) == 14):
         browser = split[9].replace(',','')
         #browser = extract_browser(browser)
-        out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[13]
+        out = split[0] + ',' + split[1] + ',' + split[4] + ',' + browser + ',' + split[8] + ',' + split[13] 
         return out
         
     elif (len(split) == 18):  
         browser = split[9].replace(',','')
         #browser = extract_browser(browser)
-        out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[16]
+        out = split[0] + ',' + split[1] + ',' + split[4] + ',' + browser + ',' + split[8] + ',' + split[16]
         return out
 
     else:
@@ -130,7 +130,7 @@ def insert_staging_log_data():
     with open(STAGING + 'merged-data.txt', 'r') as file:
         for line in file:
             values = line.strip().split(',')
-            cursor.execute('INSERT INTO staging_log_data (date, time, browser_string, ip, response_time) VALUES (%s, %s, %s, %s, %s)', values)
+            cursor.execute('INSERT INTO staging_log_data (date, time, file, browser_string, ip, response_time) VALUES (%s, %s, %s, %s, %s)', values)
             
     conn.commit()
     cursor.close()
@@ -386,6 +386,7 @@ with DAG(
             log_id SERIAL PRIMARY KEY,
             date VARCHAR,
             time VARCHAR,
+            file VARCHAR,
             browser_string VARCHAR,
             ip VARCHAR,
             response_time int
