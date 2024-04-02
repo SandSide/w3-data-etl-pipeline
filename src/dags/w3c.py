@@ -137,8 +137,6 @@ def insert_staging_log_data():
     with open(STAGING + 'merged-data.txt', 'r') as file:
         for line in file:
             values = line.strip().split(',')
-            # values[2] = re.sub(r'[\'"]', '', values[2])
-            print(values)
             cursor.execute('INSERT INTO staging_log_data (date, time, file_path, browser_string, ip, response_time) VALUES (%s, %s, %s, %s, %s, %s)', values)
             
     conn.commit()
