@@ -64,14 +64,14 @@ for line in in_file:
     
     # cleaned_string = re.sub(r'[\'"]', '', split[2])
     
-    print
+    # print
     
-    if split[0] == '2010-01-05' and split[1] == '06:32:18':
-        print(line)
-        print(len(split))
+    # if split[0] == '2010-01-05' and split[1] == '06:32:18':
+    #     print(line)
+    #     print(len(split))
     
     
-    if "'" in split[2] or '"' in split[2]:
+    if "cache" in split[2]:
         print(split[2])
     
     # if cleaned_string != split[2]:

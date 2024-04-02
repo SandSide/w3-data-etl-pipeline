@@ -580,6 +580,22 @@ with DAG(
             SELECT * FROM staging_os;
         '''
     )
+    
+    extract_unique_file_path_task = PostgresOperator(
+        task_id = 'extract_unique_file_path',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS staging_file;
+            
+            CREATE TABLE staging_file (
+                file_id SERIAL PRIMARY KEY,
+                file_path VARCHAR
+            );
+            
+            INSERT INTO staging_file (file_path)
+            SELECT DISTINCT file_path from staging_log_data;
+        '''
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -622,6 +638,9 @@ with DAG(
     # OS
     remove_staging_log_bot_data_task >> determine_os_task >> extract_unique_os_task >> build_dim_os_table_task
     
+    
+    # FILE
+    remove_staging_log_bot_data_task >> extract_unique_file_path_task
     
     # FACT TABLE
     build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task, build_dim_os_table_task])
