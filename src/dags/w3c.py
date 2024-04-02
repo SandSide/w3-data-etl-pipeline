@@ -679,7 +679,19 @@ with DAG(
         task_id = 'extract_file_details',
         python_callable = extract_file_details,
     )
-
+    
+    
+    build_dim_file_table_task = PostgresOperator(
+        task_id = 'build_dim_file_table',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS dim_file;
+            
+            CREATE TABLE dim_file AS
+            SELECT * FROM staging_file;
+        '''
+    )
+    
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
         task_id = 'build_fact_table',
@@ -723,14 +735,8 @@ with DAG(
     
     
     # FILE
-    determine_if_bot_task >> extract_unique_file_path_task >> extract_file_details_task
+    determine_if_bot_task >> extract_unique_file_path_task >> extract_file_details_task >> build_dim_file_table_task
+    
     
     # FACT TABLE
-    build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task, build_dim_os_table_task])
-    
-    
-    
-    
-# SELECT log_fact_table.date, dim_browser.browser
-# FROM log_fact_table
-# INNER JOIN dim_browser ON CAST(dim_browser.browser_id AS INTEGER) = CAST(log_fact_table.browser_id AS INTEGER);
+    build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task, build_dim_os_table_task, build_dim_file_table_task])
