@@ -369,6 +369,63 @@ def determine_os():
     conn.close()    
 
 
+def extract_file_details():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Add columns to file table
+        sql_query = '''
+            ALTER TABLE staging_file
+            ADD COLUMN IF NOT EXISTS file_name VARCHAR,
+            ADD COLUMN IF NOT EXISTS file_extension VARCHAR,
+            ADD COLUMN IF NOT EXISTS file_directory VARCHAR;
+            '''
+        cursor.execute(sql_query)
+        
+        cursor.execute('SELECT file_id, file_path FROM staging_file;')
+        result = cursor.fetchall()
+        
+        for row in result:
+            file_id, file_path = row
+            
+            values = process_file_path(file_path)
+            
+            # Insert file details
+            cursor.execute('''
+                    UPDATE staging_file
+                    SET file_name = %s, file_extension = %s, file_directory = %s
+                    WHERE  file_id = %s;
+                    ''', (*values, file_id))
+            
+        conn.commit()
+            
+    except Exception as e:
+        conn.rollback()
+        logging.exception(f'Error: {e}')
+        
+    finally:
+        cursor.close()
+        conn.close()
+        
+
+def process_file_path(file_path):
+
+    file_directory, file_name = os.path.split(file_path)
+    
+    if '+' in file_name and  '"' not in file_name:
+        file_name = file_name.split('+')[0]
+    
+    a, file_extension = os.path.splitext(file_name)
+    
+    if file_name == '':
+        file_name = 'undefined'
+
+    if file_extension == '':
+        file_extension = 'undefined'  
+        
+    return (file_name, file_extension, file_directory)     
+        
 
 with DAG(
     dag_id = 'Process_W3_Data',                          
@@ -581,6 +638,8 @@ with DAG(
         '''
     )
     
+    ## FILE TASKS
+    
     extract_unique_file_path_task = PostgresOperator(
         task_id = 'extract_unique_file_path',
         sql = 
@@ -595,6 +654,11 @@ with DAG(
             INSERT INTO staging_file (file_path)
             SELECT DISTINCT file_path from staging_log_data;
         '''
+    )
+    
+    extract_file_details_task = PythonOperator(
+        task_id = 'extract_file_details',
+        python_callable = extract_file_details,
     )
 
     ##### FACT TASKS ######
@@ -640,7 +704,7 @@ with DAG(
     
     
     # FILE
-    remove_staging_log_bot_data_task >> extract_unique_file_path_task
+    remove_staging_log_bot_data_task >> extract_unique_file_path_task >> extract_file_details_task
     
     # FACT TABLE
     build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task, build_dim_os_table_task])
