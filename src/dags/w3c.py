@@ -11,7 +11,7 @@ import os
 import csv
 import datetime as dt
 from datetime import datetime
-
+import re
 
 # DODGY CODE
 import subprocess
@@ -97,27 +97,34 @@ def process_log_file(filename):
     
 def process_log_line(line):    
     
+    
     split = line.split(' ')
     
     logging.debug('Processing ', len(split))
     
+   
     if (len(split) == 14):
         browser = split[9].replace(',','')
-        #browser = extract_browser(browser)
-        out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[13]
+        file_path = split[4].replace(',','')
+        out = split[0] + ',' + split[1] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[13] 
         return out
         
     elif (len(split) == 18):  
         browser = split[9].replace(',','')
-        #browser = extract_browser(browser)
-        out = split[0] + ',' + split[1] + ',' + browser + ',' + split[8] + ',' + split[16]
+        file_path = split[4].replace(',','')
+        out = split[0] + ',' + split[1] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[16]
         return out
 
     else:
         logging.debug('Fault line ' + str(len(split)))
         return None
+         
             
-    
+def sanitize_string(string):
+    clean = re.sub(r'[^\w/.]', '', string)
+    return clean
+   
+     
 def clear_files():
     out_file_long = open(STAGING + 'merged-data.txt', 'w')
     
@@ -130,7 +137,7 @@ def insert_staging_log_data():
     with open(STAGING + 'merged-data.txt', 'r') as file:
         for line in file:
             values = line.strip().split(',')
-            cursor.execute('INSERT INTO staging_log_data (date, time, browser_string, ip, response_time) VALUES (%s, %s, %s, %s, %s)', values)
+            cursor.execute('INSERT INTO staging_log_data (date, time, file_path, browser_string, ip, response_time) VALUES (%s, %s, %s, %s, %s, %s)', values)
             
     conn.commit()
     cursor.close()
@@ -169,32 +176,50 @@ def update_date_with_details():
     conn.close()
     
 
-def remove_bot_log_data():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT log_id, browser_string FROM staging_log_data;')
-    result = cursor.fetchall()
-    
-    for log in result:
+def determine_if_bot():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        log_id, browser = log
+        
+        sql_query = '''
+            ALTER TABLE staging_log_data
+            ADD COLUMN IF NOT EXISTS is_bot BOOLEAN
+            '''
+        cursor.execute(sql_query)
+        
 
-        if is_bot(browser):
-            cursor.execute('DELETE FROM staging_log_data WHERE log_id = %s;', (log_id,))
-            logging.debug(f'Deleting log {str(log_id)} because {browser}')
+        cursor.execute('SELECT log_id, file_path, browser_string FROM staging_log_data;')
+        result = cursor.fetchall()
         
-    deleted_rows = cursor.rowcount
-    logging.debug(f'Number of bots deleted: {deleted_rows}')
+        for row in result:
+            
+            log_id, file_path, browser = row
+            
+            is_bot_result = is_bot(browser, file_path)
+            
+            cursor.execute('''
+                UPDATE staging_log_data
+                SET is_bot = %s
+                WHERE log_id = %s;
+                ''', (is_bot_result, log_id))
+            
+        conn.commit()
+            
+    except Exception as e:
+        conn.rollback()
+        logging.exception(f'Error: {e}')
+        raise
+        
+    finally:
+        cursor.close()
+        conn.close()
     
-    conn.commit()
-    cursor.close()
-    conn.close()
     
-    
-def is_bot(string):
-    parsed_ua = parse(string)
-    return parsed_ua.is_bot
+def is_bot(browser, file_path):
+    parsed_ua = parse(browser)
+    return parsed_ua.is_bot or file_path == '/robots.txt'
+
 
 
 def extract_date_details(date):
@@ -362,6 +387,64 @@ def determine_os():
     conn.close()    
 
 
+def extract_file_details():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Add columns to file table
+        sql_query = '''
+            ALTER TABLE staging_file
+            ADD COLUMN IF NOT EXISTS file_name VARCHAR,
+            ADD COLUMN IF NOT EXISTS file_extension VARCHAR,
+            ADD COLUMN IF NOT EXISTS file_directory VARCHAR;
+            '''
+        cursor.execute(sql_query)
+        
+        cursor.execute('SELECT file_id, file_path FROM staging_file;')
+        result = cursor.fetchall()
+        
+        for row in result:
+            file_id, file_path = row
+            
+            values = process_file_path(file_path)
+            
+            # Insert file details
+            cursor.execute('''
+                    UPDATE staging_file
+                    SET file_name = %s, file_extension = %s, file_directory = %s
+                    WHERE  file_id = %s;
+                    ''', (*values, file_id))
+            
+        conn.commit()
+            
+    except Exception as e:
+        conn.rollback()
+        logging.exception(f'Error: {e}')
+        raise
+    
+    finally:
+        cursor.close()
+        conn.close()
+        
+
+def process_file_path(file_path):
+
+    file_directory, file_name = os.path.split(file_path)
+    
+    if '+' in file_name and  '"' not in file_name:
+        file_name = file_name.split('+')[0]
+    
+    a, file_extension = os.path.splitext(file_name)
+    
+    if file_name == '':
+        file_name = 'undefined'
+
+    if file_extension == '':
+        file_extension = 'undefined'  
+        
+    return (file_name, file_extension, file_directory)     
+        
 
 with DAG(
     dag_id = 'Process_W3_Data',                          
@@ -386,6 +469,7 @@ with DAG(
             log_id SERIAL PRIMARY KEY,
             date VARCHAR,
             time VARCHAR,
+            file_path VARCHAR,
             browser_string VARCHAR,
             ip VARCHAR,
             response_time int
@@ -398,29 +482,22 @@ with DAG(
         python_callable = insert_staging_log_data,
     )
     
-    remove_staging_log_bot_data_task = PythonOperator(
-        task_id = 'remove_bot_log',
-        python_callable = remove_bot_log_data,
+    determine_if_bot_task = PythonOperator(
+        task_id = 'determine_if_bot',
+        python_callable = determine_if_bot,
     )
 
 
     ###### IP TASKS ######
-    create_staging_ip_table_task = PostgresOperator(
-        task_id = 'create_staging_ip_table',
-        sql = 
-        '''
-            CREATE TABLE IF NOT EXISTS staging_ip(
-                ip_id SERIAL PRIMARY KEY,
-                ip VARCHAR
-            )
-        '''
-    )
-
-
     extract_unique_ip_task = PostgresOperator(
         task_id = 'extract_unique_ip',
         sql = 
-        '''        
+        ''' 
+            CREATE TABLE IF NOT EXISTS staging_ip(
+                ip_id SERIAL PRIMARY KEY,
+                ip VARCHAR
+            );
+            
             INSERT INTO staging_ip (ip)
             SELECT DISTINCT ip 
             FROM staging_log_data
@@ -449,17 +526,6 @@ with DAG(
         '''
     )
     
-    
-    update_staging_log_with_ip_dim_task = PostgresOperator(
-        task_id = 'update_staging_log_with_ip_id',
-        sql = 
-        '''
-            UPDATE staging_log_data AS f
-            SET ip = dim.ip_id
-            FROM dim_ip AS dim
-            WHERE f.ip = dim.ip;
-        '''
-    )
     
     ###### DATE TASKS ######
     extract_unique_date_task = PostgresOperator(
@@ -494,16 +560,16 @@ with DAG(
         '''
     )
         
-    update_staging_log_with_date_dim_task = PostgresOperator(
-        task_id = 'update_staging_log_with_date_id',
-        sql = 
-        '''
-            UPDATE staging_log_data AS f
-            SET date = dim.date_id
-            FROM dim_date AS dim
-            WHERE f.date = dim.date;
-        '''
-    )
+    # update_staging_log_with_date_dim_task = PostgresOperator(
+    #     task_id = 'update_staging_log_with_date_id',
+    #     sql = 
+    #     '''
+    #         UPDATE staging_log_data AS f
+    #         SET date = dim.date_id
+    #         FROM dim_date AS dim
+    #         WHERE f.date = dim.date;
+    #     '''
+    # )
 
     ##### BROWSER TASKS ######
     
@@ -572,7 +638,42 @@ with DAG(
             SELECT * FROM staging_os;
         '''
     )
-
+    
+    ## FILE TASKS
+    
+    extract_unique_file_path_task = PostgresOperator(
+        task_id = 'extract_unique_file_path',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS staging_file;
+            
+            CREATE TABLE staging_file (
+                file_id SERIAL PRIMARY KEY,
+                file_path VARCHAR
+            );
+            
+            INSERT INTO staging_file (file_path)
+            SELECT DISTINCT file_path from staging_log_data;
+        '''
+    )
+    
+    extract_file_details_task = PythonOperator(
+        task_id = 'extract_file_details',
+        python_callable = extract_file_details,
+    )
+    
+    
+    build_dim_file_table_task = PostgresOperator(
+        task_id = 'build_dim_file_table',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS dim_file;
+            
+            CREATE TABLE dim_file AS
+            SELECT * FROM staging_file;
+        '''
+    )
+    
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
         task_id = 'build_fact_table',
@@ -581,7 +682,12 @@ with DAG(
             DROP TABLE IF EXISTS log_fact_table;
             
             CREATE TABLE log_fact_table AS
-            SELECT log_id, date, time, browser, os, response_time FROM staging_log_data;
+            SELECT log_id, date, time, file_path, ip, browser, os, response_time, is_bot FROM staging_log_data;
+            
+            UPDATE log_fact_table AS f
+            SET ip = dim.ip_id
+            FROM dim_ip AS dim
+            WHERE f.ip = dim.ip;
             
             UPDATE log_fact_table AS f
             SET browser = dim.browser_id
@@ -592,35 +698,44 @@ with DAG(
             SET os = dim.os_id
             FROM dim_os AS dim
             WHERE f.os = dim.os;
+            
+            UPDATE log_fact_table AS f
+            SET file_path = dim.file_id
+            FROM dim_file AS dim
+            WHERE f.file_path = dim.file_path;
+            
+            ALTER TABLE log_fact_table
+            ALTER COLUMN date TYPE INT USING date::INT,
+            ALTER COLUMN file_path TYPE INT USING file_path::INT,
+            ALTER COLUMN ip TYPE INT USING ip::INT,
+            ALTER COLUMN browser TYPE INT USING browser::INT,
+            ALTER COLUMN os TYPE INT USING os::INT;
         '''
     )
 
     # START
-    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> remove_staging_log_bot_data_task
+    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> determine_if_bot_task
     
     
     # IP
-    remove_staging_log_bot_data_task >> create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
+    determine_if_bot_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task
 
 
     # DATE
-    remove_staging_log_bot_data_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task >> update_staging_log_with_date_dim_task
+    determine_if_bot_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task
 
 
     # BROWSER
-    remove_staging_log_bot_data_task >> determine_browser_task >> extract_unique_browser_task >> build_dim_browser_table_task
+    determine_if_bot_task >> determine_browser_task >> extract_unique_browser_task >> build_dim_browser_table_task
     
     
     # OS
-    remove_staging_log_bot_data_task >> determine_os_task >> extract_unique_os_task >> build_dim_os_table_task
+    determine_if_bot_task >> determine_os_task >> extract_unique_os_task >> build_dim_os_table_task
+    
+    
+    # FILE
+    determine_if_bot_task >> extract_unique_file_path_task >> extract_file_details_task >> build_dim_file_table_task
     
     
     # FACT TABLE
-    build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task, build_dim_os_table_task])
-    
-    
-    
-    
-# SELECT log_fact_table.date, dim_browser.browser
-# FROM log_fact_table
-# INNER JOIN dim_browser ON CAST(dim_browser.browser_id AS INTEGER) = CAST(log_fact_table.browser_id AS INTEGER);
+    build_fact_table_task.set_upstream(task_or_task_list = [build_dim_ip_table_task, build_dim_date_table_task, build_dim_browser_table_task, build_dim_os_table_task, build_dim_file_table_task])
