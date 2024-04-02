@@ -703,6 +703,13 @@ with DAG(
             SET file_path = dim.file_id
             FROM dim_file AS dim
             WHERE f.file_path = dim.file_path;
+            
+            ALTER TABLE log_fact_table
+            ALTER COLUMN date TYPE INT USING date::INT,
+            ALTER COLUMN file_path TYPE INT USING file_path::INT,
+            ALTER COLUMN ip TYPE INT USING ip::INT,
+            ALTER COLUMN browser TYPE INT USING browser::INT,
+            ALTER COLUMN os TYPE INT USING os::INT;
         '''
     )
 

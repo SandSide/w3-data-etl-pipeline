@@ -134,4 +134,9 @@ def determine_bots():
     print(robots_2)
         
     
-determine_bots()
+def status_code():
+    in_file = open('src/data/staging/merged-data.txt', 'r')
+    
+    for line in in_file:
+        
+        file_path = line.split(',')[2]
