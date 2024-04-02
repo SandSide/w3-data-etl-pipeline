@@ -581,12 +581,17 @@ with DAG(
             DROP TABLE IF EXISTS log_fact_table;
             
             CREATE TABLE log_fact_table AS
-            SELECT log_id, date, time, browser, response_time FROM staging_log_data;
+            SELECT log_id, date, time, browser, os, response_time FROM staging_log_data;
             
             UPDATE log_fact_table AS f
             SET browser = dim.browser_id
             FROM dim_browser AS dim
             WHERE f.browser = dim.browser;
+            
+            UPDATE log_fact_table AS f
+            SET os = dim.os_id
+            FROM dim_os AS dim
+            WHERE f.os = dim.os;
         '''
     )
 
@@ -611,7 +616,7 @@ with DAG(
     
     
     # FACT TABLE
-    build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task])
+    build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task, build_dim_os_table_task])
     
     
     
