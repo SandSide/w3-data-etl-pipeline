@@ -176,32 +176,50 @@ def update_date_with_details():
     conn.close()
     
 
-def remove_bot_log_data():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT log_id, browser_string FROM staging_log_data;')
-    result = cursor.fetchall()
-    
-    for log in result:
+def determine_if_bot():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        log_id, browser = log
+        
+        sql_query = '''
+            ALTER TABLE staging_log_data
+            ADD COLUMN IF NOT EXISTS is_bot BOOLEAN
+            '''
+        cursor.execute(sql_query)
+        
 
-        if is_bot(browser):
-            cursor.execute('DELETE FROM staging_log_data WHERE log_id = %s;', (log_id,))
-            logging.debug(f'Deleting log {str(log_id)} because {browser}')
+        cursor.execute('SELECT log_id, file_path, browser_string FROM staging_log_data;')
+        result = cursor.fetchall()
         
-    deleted_rows = cursor.rowcount
-    logging.debug(f'Number of bots deleted: {deleted_rows}')
+        for row in result:
+            
+            log_id, file_path, browser = row
+            
+            is_bot_result = is_bot(browser, file_path)
+            
+            cursor.execute('''
+                UPDATE staging_log_data
+                SET is_bot = %s
+                WHERE log_id = %s;
+                ''', (is_bot_result, log_id))
+            
+        conn.commit()
+            
+    except Exception as e:
+        conn.rollback()
+        logging.exception(f'Error: {e}')
+        raise
+        
+    finally:
+        cursor.close()
+        conn.close()
     
-    conn.commit()
-    cursor.close()
-    conn.close()
     
-    
-def is_bot(string):
-    parsed_ua = parse(string)
-    return parsed_ua.is_bot
+def is_bot(browser, file_path):
+    parsed_ua = parse(browser)
+    return parsed_ua.is_bot or file_path == '/robots.txt'
+
 
 
 def extract_date_details(date):
@@ -403,7 +421,8 @@ def extract_file_details():
     except Exception as e:
         conn.rollback()
         logging.exception(f'Error: {e}')
-        
+        raise
+    
     finally:
         cursor.close()
         conn.close()
@@ -463,9 +482,9 @@ with DAG(
         python_callable = insert_staging_log_data,
     )
     
-    remove_staging_log_bot_data_task = PythonOperator(
-        task_id = 'remove_bot_log',
-        python_callable = remove_bot_log_data,
+    determine_if_bot_task = PythonOperator(
+        task_id = 'determine_if_bot',
+        python_callable = determine_if_bot,
     )
 
 
@@ -684,27 +703,27 @@ with DAG(
     )
 
     # START
-    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> remove_staging_log_bot_data_task
+    extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> determine_if_bot_task
     
     
     # IP
-    remove_staging_log_bot_data_task >> create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
+    determine_if_bot_task >> create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
 
 
     # DATE
-    remove_staging_log_bot_data_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task >> update_staging_log_with_date_dim_task
+    determine_if_bot_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task >> update_staging_log_with_date_dim_task
 
 
     # BROWSER
-    remove_staging_log_bot_data_task >> determine_browser_task >> extract_unique_browser_task >> build_dim_browser_table_task
+    determine_if_bot_task >> determine_browser_task >> extract_unique_browser_task >> build_dim_browser_table_task
     
     
     # OS
-    remove_staging_log_bot_data_task >> determine_os_task >> extract_unique_os_task >> build_dim_os_table_task
+    determine_if_bot_task >> determine_os_task >> extract_unique_os_task >> build_dim_os_table_task
     
     
     # FILE
-    remove_staging_log_bot_data_task >> extract_unique_file_path_task >> extract_file_details_task
+    determine_if_bot_task >> extract_unique_file_path_task >> extract_file_details_task
     
     # FACT TABLE
     build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task, build_dim_os_table_task])

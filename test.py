@@ -56,7 +56,7 @@ def process_log_line(line):
 #     pattern = r'^[a-zA-Z0-9_0./-]+$'
 #     return bool(re.match(pattern, string))
 
-in_file = open('src/data/staging/merged-data.txt', 'r')
+
 
 
 file_type_mapping = {
@@ -70,45 +70,68 @@ file_type_mapping = {
     'txt': 'Text',
 }
 
-robot_count = 0
+def extract_file_details():
+    in_file = open('src/data/staging/merged-data.txt', 'r')
 
-for line in in_file:
-    
-    split = line.strip().split(',')
-    file_path = split[2]
-    #file_path = '/Darwin/Home.aspx+com.othermedia.webkit.exceptions.Resource'
-    # file_path =  '/Darwin/"+++markerList[i][0]+++"'
-    
-    # file_name = file_path.split('/')[-1]
-    
-    file_directory, file_name = os.path.split(file_path)
-    
-    if '+' in file_name and  '"' not in file_name:
-        file_name = file_name.split('+')[0]
-    
-    a, file_extension = os.path.splitext(file_name)
-    
-    if file_name == '':
-        file_name = 'undefined'
+    robot_count = 0
+    for line in in_file:
+        
+        split = line.strip().split(',')
+        file_path = split[2]
+        #file_path = '/Darwin/Home.aspx+com.othermedia.webkit.exceptions.Resource'
+        # file_path =  '/Darwin/"+++markerList[i][0]+++"'
+        
+        # file_name = file_path.split('/')[-1]
+        
+        file_directory, file_name = os.path.split(file_path)
+        
+        if '+' in file_name and  '"' not in file_name:
+            file_name = file_name.split('+')[0]
+        
+        a, file_extension = os.path.splitext(file_name)
+        
+        if file_name == '':
+            file_name = 'undefined'
 
-    if file_extension == '':
-        file_extension = 'undefined'       
+        if file_extension == '':
+            file_extension = 'undefined'       
+            
+            
+        # if file_name is '':
+        #     file_name = 'undefined'
+        #     file_type = 'undefined'
+        # else:
+        #     file_type = file_name.split('.')[-1]
+            
+        # file_directory = file_path[:len(file_path) - len(file_name)]
         
         
-    # if file_name is '':
-    #     file_name = 'undefined'
-    #     file_type = 'undefined'
-    # else:
-    #     file_type = file_name.split('.')[-1]
+        if file_name == 'robots.txt':
+            print(split[3])
+            robot_count += 1
         
-    # file_directory = file_path[:len(file_path) - len(file_name)]
-    
-    
-    if file_name == 'robots.txt':
-        print(split[3])
-        robot_count += 1
-    
-    # print(f'{file_path}, {file_name}, {file_extension}, {file_directory}')
+        # print(f'{file_path}, {file_name}, {file_extension}, {file_directory}')
     
     # break
-print(robot_count)
+    
+def determine_bots():
+    
+    robots_1 = 0
+    robots_2 = 0
+    in_file = open('src/data/staging/merged-data.txt', 'r')
+    
+    for line in in_file:
+        
+        file_path = line.split(',')[2]
+        
+        if file_path == '/robots.txt':
+            robots_1 += 1
+                    
+        if 'robots' in file_path:
+            robots_2 += 1
+            
+    print(robots_1)
+    print(robots_2)
+        
+    
+determine_bots()
