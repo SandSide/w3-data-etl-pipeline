@@ -326,6 +326,7 @@ def determine_browser():
     cursor.close()
     conn.close() 
 
+
 def determine_os():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -359,6 +360,8 @@ def determine_os():
     conn.commit()
     cursor.close()
     conn.close()    
+
+
 
 with DAG(
     dag_id = 'Process_W3_Data',                          
@@ -557,21 +560,15 @@ with DAG(
     
     # IP
     remove_staging_log_bot_data_task >> create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
-    # extract_unique_ip_task.set_upstream(task_or_task_list = create_staging_ip_table_task)
-    # update_ip_with_location_task.set_upstream(task_or_task_list = extract_unique_ip_task)
-    # build_dim_ip_table_task.set_upstream(task_or_task_list = update_ip_with_location_task)
-    # update_staging_log_with_ip_dim_task.set_upstream(task_or_task_list = build_dim_ip_table_task)
-    
+
+
     # DATE
     remove_staging_log_bot_data_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task >> update_staging_log_with_date_dim_task
-    # extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
-    # update_date_with_details_task.set_upstream(task_or_task_list = extract_unique_date_task)
-    # build_dim_date_table_task.set_upstream(task_or_task_list = update_date_with_details_task)
-    # update_staging_date_with_date_dim_task.set_upstream(task_or_task_list = buildbuild_dim_date_table_task_dim_ip_table_task)
-    
-    
+
+
     # BROWSER
     remove_staging_log_bot_data_task >> determine_browser_task >> extract_unique_browser_task >> build_dim_browser_table_task
+    
     
     # FACT TABLE
     build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task])
