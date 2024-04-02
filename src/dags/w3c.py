@@ -561,7 +561,17 @@ with DAG(
             SELECT DISTINCT os from staging_log_data;
         '''
     )
-        
+    
+    build_dim_os_table_task = PostgresOperator(
+        task_id = 'build_dim_os_table',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS dim_os;
+            
+            CREATE TABLE dim_os AS
+            SELECT * FROM staging_os;
+        '''
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -597,7 +607,7 @@ with DAG(
     
     
     # OS
-    remove_staging_log_bot_data_task >> determine_os_task >> extract_unique_os_task
+    remove_staging_log_bot_data_task >> determine_os_task >> extract_unique_os_task >> build_dim_os_table_task
     
     
     # FACT TABLE
