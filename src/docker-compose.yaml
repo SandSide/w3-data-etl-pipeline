@@ -188,6 +188,7 @@ services:
     command:
       - -c
       - |
+        pip install user-agents
         if [[ -z "${AIRFLOW_UID}" ]]; then
           echo
           echo -e "\033[1;33mWARNING!!!: AIRFLOW_UID not set!\e[0m"
