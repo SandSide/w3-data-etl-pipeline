@@ -5,3 +5,4 @@
 /src/data/star-schema
 /src/logs/dag_processor_manager
 src/logs/dag_processor_manager/dag_processor_manager.log
+test-merged-data.txt

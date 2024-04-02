@@ -1,5 +1,7 @@
 import re
 import os
+
+RAW_DATA = 'src/data/W3SVC1/'
 # from user_agents import parse
 
 # s = 'Mozilla/4.0+(compatible;+MSIE+7.0;+Windows+NT+5.1;+SIMBAR={425A48EA-D0F7-11DE-A478-001E9090E619};+InfoPath.2;+.NET+CLR+2.0.50727;+OfficeLiveConnector.1.3;+OfficeLivePatch.0.0)'
@@ -132,7 +134,69 @@ def determine_bots():
             
     print(robots_1)
     print(robots_2)
+ 
+    
+def process_raw_data():
+   
+    arr = os.listdir(RAW_DATA)
+   
+    if not arr:
+        print('Raw data folder is empty')
+  
+    out_file_long = open('test-merged-data.txt', 'w')
+    out_file_long.close()
+    
+    for f in arr:
+        process_log_file(f)
         
+        
+def process_log_file(filename):
+    type = filename[-3:len(filename)]
+    
+    if (type == 'log'):
+        
+        in_file = open(RAW_DATA + filename, 'r')
+        out_file = open('test-merged-data.txt', 'a')
+        
+        lines = in_file.readlines()
+        
+        for line in lines:
+            
+            if (line[0] != '#'):
+            
+                result = process_log_line(line)
+
+                if result:
+                    if not result.endswith('\n'):
+                        result += '\n'
+                        
+                    out_file.write(result)
+
+                
+        in_file.close()
+        out_file.close()
+                 
+    
+def process_log_line(line):    
+    
+    split = line.split(' ')
+    
+
+    if (len(split) == 14):
+        browser = split[9].replace(',','')
+        file_path = split[4].replace(',','')
+        out = split[0] + ',' + split[1] + ',' + split[3] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[13] 
+        return out
+        
+    elif (len(split) == 18):  
+        browser = split[9].replace(',','')
+        file_path = split[4].replace(',','')
+        out = split[0] + ',' + split[1] + ',' + split[3] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[16]
+        return out
+
+    else:
+        return None    
+    
     
 def status_code():
     in_file = open('src/data/staging/merged-data.txt', 'r')
@@ -140,3 +204,6 @@ def status_code():
     for line in in_file:
         
         file_path = line.split(',')[2]
+        
+
+process_raw_data()
