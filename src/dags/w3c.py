@@ -72,7 +72,7 @@ def process_log_file(filename):
     if (type == 'log'):
         
         in_file = open(RAW_DATA + filename, 'r')
-        out_file_robot = open(STAGING + 'data-robot.txt', 'r')
+        out_file_robot = open(STAGING + 'data-robot.txt', 'w')
         out_file = open(STAGING + 'merged-data.txt', 'a')
         
         lines = in_file.readlines()
@@ -538,6 +538,15 @@ with DAG(
             SELECT * FROM staging_browser;
         '''
     )
+    
+    ##### OS TASKS ######  
+    
+    determine_os_task = PythonOperator(
+        task_id = 'determine_os',
+        python_callable = determine_os,
+    )
+    
+    
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -556,7 +565,9 @@ with DAG(
         '''
     )
 
+    # START
     extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> remove_staging_log_bot_data_task
+    
     
     # IP
     remove_staging_log_bot_data_task >> create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
@@ -568,6 +579,10 @@ with DAG(
 
     # BROWSER
     remove_staging_log_bot_data_task >> determine_browser_task >> extract_unique_browser_task >> build_dim_browser_table_task
+    
+    
+    # OS
+    remove_staging_log_bot_data_task >> determine_os_task
     
     
     # FACT TABLE
