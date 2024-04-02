@@ -11,7 +11,7 @@ import os
 import csv
 import datetime as dt
 from datetime import datetime
-
+import re
 
 # DODGY CODE
 import subprocess
@@ -97,27 +97,34 @@ def process_log_file(filename):
     
 def process_log_line(line):    
     
+    
     split = line.split(' ')
     
     logging.debug('Processing ', len(split))
     
+   
     if (len(split) == 14):
         browser = split[9].replace(',','')
-        #browser = extract_browser(browser)
-        out = split[0] + ',' + split[1] + ',' + split[4] + ',' + browser + ',' + split[8] + ',' + split[13] 
+        file_path = split[4].replace(',','')
+        out = split[0] + ',' + split[1] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[13] 
         return out
         
     elif (len(split) == 18):  
         browser = split[9].replace(',','')
-        #browser = extract_browser(browser)
-        out = split[0] + ',' + split[1] + ',' + split[4] + ',' + browser + ',' + split[8] + ',' + split[16]
+        file_path = split[4].replace(',','')
+        out = split[0] + ',' + split[1] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[16]
         return out
 
     else:
         logging.debug('Fault line ' + str(len(split)))
         return None
+         
             
-    
+def sanitize_string(string):
+    clean = re.sub(r'[^\w/.]', '', string)
+    return clean
+   
+     
 def clear_files():
     out_file_long = open(STAGING + 'merged-data.txt', 'w')
     
@@ -130,7 +137,9 @@ def insert_staging_log_data():
     with open(STAGING + 'merged-data.txt', 'r') as file:
         for line in file:
             values = line.strip().split(',')
-            cursor.execute('INSERT INTO staging_log_data (date, time, file, browser_string, ip, response_time) VALUES (%s, %s, %s, %s, %s)', values)
+            # values[2] = re.sub(r'[\'"]', '', values[2])
+            print(values)
+            cursor.execute('INSERT INTO staging_log_data (date, time, file_path, browser_string, ip, response_time) VALUES (%s, %s, %s, %s, %s, %s)', values)
             
     conn.commit()
     cursor.close()
@@ -386,7 +395,7 @@ with DAG(
             log_id SERIAL PRIMARY KEY,
             date VARCHAR,
             time VARCHAR,
-            file VARCHAR,
+            file_path VARCHAR,
             browser_string VARCHAR,
             ip VARCHAR,
             response_time int
