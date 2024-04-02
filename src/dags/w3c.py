@@ -489,22 +489,15 @@ with DAG(
 
 
     ###### IP TASKS ######
-    create_staging_ip_table_task = PostgresOperator(
-        task_id = 'create_staging_ip_table',
-        sql = 
-        '''
-            CREATE TABLE IF NOT EXISTS staging_ip(
-                ip_id SERIAL PRIMARY KEY,
-                ip VARCHAR
-            )
-        '''
-    )
-
-
     extract_unique_ip_task = PostgresOperator(
         task_id = 'extract_unique_ip',
         sql = 
-        '''        
+        ''' 
+            CREATE TABLE IF NOT EXISTS staging_ip(
+                ip_id SERIAL PRIMARY KEY,
+                ip VARCHAR
+            );
+            
             INSERT INTO staging_ip (ip)
             SELECT DISTINCT ip 
             FROM staging_log_data
@@ -533,17 +526,6 @@ with DAG(
         '''
     )
     
-    
-    update_staging_log_with_ip_dim_task = PostgresOperator(
-        task_id = 'update_staging_log_with_ip_id',
-        sql = 
-        '''
-            UPDATE staging_log_data AS f
-            SET ip = dim.ip_id
-            FROM dim_ip AS dim
-            WHERE f.ip = dim.ip;
-        '''
-    )
     
     ###### DATE TASKS ######
     extract_unique_date_task = PostgresOperator(
@@ -578,16 +560,16 @@ with DAG(
         '''
     )
         
-    update_staging_log_with_date_dim_task = PostgresOperator(
-        task_id = 'update_staging_log_with_date_id',
-        sql = 
-        '''
-            UPDATE staging_log_data AS f
-            SET date = dim.date_id
-            FROM dim_date AS dim
-            WHERE f.date = dim.date;
-        '''
-    )
+    # update_staging_log_with_date_dim_task = PostgresOperator(
+    #     task_id = 'update_staging_log_with_date_id',
+    #     sql = 
+    #     '''
+    #         UPDATE staging_log_data AS f
+    #         SET date = dim.date_id
+    #         FROM dim_date AS dim
+    #         WHERE f.date = dim.date;
+    #     '''
+    # )
 
     ##### BROWSER TASKS ######
     
@@ -700,7 +682,12 @@ with DAG(
             DROP TABLE IF EXISTS log_fact_table;
             
             CREATE TABLE log_fact_table AS
-            SELECT log_id, date, time, browser, os, response_time FROM staging_log_data;
+            SELECT log_id, date, time, file_path, ip, browser, os, response_time, is_bot FROM staging_log_data;
+            
+            UPDATE log_fact_table AS f
+            SET ip = dim.ip_id
+            FROM dim_ip AS dim
+            WHERE f.ip = dim.ip;
             
             UPDATE log_fact_table AS f
             SET browser = dim.browser_id
@@ -711,6 +698,11 @@ with DAG(
             SET os = dim.os_id
             FROM dim_os AS dim
             WHERE f.os = dim.os;
+            
+            UPDATE log_fact_table AS f
+            SET file_path = dim.file_id
+            FROM dim_file AS dim
+            WHERE f.file_path = dim.file_path;
         '''
     )
 
@@ -719,11 +711,11 @@ with DAG(
     
     
     # IP
-    determine_if_bot_task >> create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
+    determine_if_bot_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task
 
 
     # DATE
-    determine_if_bot_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task >> update_staging_log_with_date_dim_task
+    determine_if_bot_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task
 
 
     # BROWSER
@@ -739,4 +731,4 @@ with DAG(
     
     
     # FACT TABLE
-    build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task, build_dim_os_table_task, build_dim_file_table_task])
+    build_fact_table_task.set_upstream(task_or_task_list = [build_dim_ip_table_task, build_dim_date_table_task, build_dim_browser_table_task, build_dim_os_table_task, build_dim_file_table_task])
