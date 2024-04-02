@@ -72,7 +72,7 @@ def process_log_file(filename):
     if (type == 'log'):
         
         in_file = open(RAW_DATA + filename, 'r')
-        out_file_robot = open(STAGING + 'data-robot.txt', 'r')
+        out_file_robot = open(STAGING + 'data-robot.txt', 'w')
         out_file = open(STAGING + 'merged-data.txt', 'a')
         
         lines = in_file.readlines()
@@ -326,6 +326,7 @@ def determine_browser():
     cursor.close()
     conn.close() 
 
+
 def determine_os():
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -359,6 +360,8 @@ def determine_os():
     conn.commit()
     cursor.close()
     conn.close()    
+
+
 
 with DAG(
     dag_id = 'Process_W3_Data',                          
@@ -535,6 +538,40 @@ with DAG(
             SELECT * FROM staging_browser;
         '''
     )
+    
+    ##### OS TASKS ######  
+    
+    determine_os_task = PythonOperator(
+        task_id = 'determine_os',
+        python_callable = determine_os,
+    )
+    
+    extract_unique_os_task = PostgresOperator(
+        task_id = 'extract_unique_os',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS staging_os;
+            
+            CREATE TABLE staging_os (
+                os_id SERIAL PRIMARY KEY,
+                os VARCHAR
+            );
+            
+            INSERT INTO staging_os (os)
+            SELECT DISTINCT os from staging_log_data;
+        '''
+    )
+    
+    build_dim_os_table_task = PostgresOperator(
+        task_id = 'build_dim_os_table',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS dim_os;
+            
+            CREATE TABLE dim_os AS
+            SELECT * FROM staging_os;
+        '''
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -544,37 +581,42 @@ with DAG(
             DROP TABLE IF EXISTS log_fact_table;
             
             CREATE TABLE log_fact_table AS
-            SELECT log_id, date, time, browser, response_time FROM staging_log_data;
+            SELECT log_id, date, time, browser, os, response_time FROM staging_log_data;
             
             UPDATE log_fact_table AS f
             SET browser = dim.browser_id
             FROM dim_browser AS dim
             WHERE f.browser = dim.browser;
+            
+            UPDATE log_fact_table AS f
+            SET os = dim.os_id
+            FROM dim_os AS dim
+            WHERE f.os = dim.os;
         '''
     )
 
+    # START
     extract_raw_data_task >> create_staging_log_data_table_task >> insert_staging_log_data_task >> remove_staging_log_bot_data_task
+    
     
     # IP
     remove_staging_log_bot_data_task >> create_staging_ip_table_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task >> update_staging_log_with_ip_dim_task
-    # extract_unique_ip_task.set_upstream(task_or_task_list = create_staging_ip_table_task)
-    # update_ip_with_location_task.set_upstream(task_or_task_list = extract_unique_ip_task)
-    # build_dim_ip_table_task.set_upstream(task_or_task_list = update_ip_with_location_task)
-    # update_staging_log_with_ip_dim_task.set_upstream(task_or_task_list = build_dim_ip_table_task)
-    
+
+
     # DATE
     remove_staging_log_bot_data_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task >> update_staging_log_with_date_dim_task
-    # extract_unique_date_task.set_upstream(task_or_task_list = insert_staging_log_data_task)
-    # update_date_with_details_task.set_upstream(task_or_task_list = extract_unique_date_task)
-    # build_dim_date_table_task.set_upstream(task_or_task_list = update_date_with_details_task)
-    # update_staging_date_with_date_dim_task.set_upstream(task_or_task_list = buildbuild_dim_date_table_task_dim_ip_table_task)
-    
-    
+
+
     # BROWSER
     remove_staging_log_bot_data_task >> determine_browser_task >> extract_unique_browser_task >> build_dim_browser_table_task
     
+    
+    # OS
+    remove_staging_log_bot_data_task >> determine_os_task >> extract_unique_os_task >> build_dim_os_table_task
+    
+    
     # FACT TABLE
-    build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task])
+    build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task, build_dim_os_table_task])
     
     
     
