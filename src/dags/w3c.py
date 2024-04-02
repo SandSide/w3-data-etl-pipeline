@@ -544,7 +544,12 @@ with DAG(
             DROP TABLE IF EXISTS log_fact_table;
             
             CREATE TABLE log_fact_table AS
-            SELECT * FROM staging_log_data;
+            SELECT log_id, date, time, browser, response_time FROM staging_log_data;
+            
+            UPDATE log_fact_table AS f
+            SET browser = dim.browser_id
+            FROM dim_browser AS dim
+            WHERE f.browser = dim.browser;
         '''
     )
 
@@ -570,3 +575,10 @@ with DAG(
     
     # FACT TABLE
     build_fact_table_task.set_upstream(task_or_task_list = [update_staging_log_with_ip_dim_task, update_staging_log_with_date_dim_task, build_dim_browser_table_task])
+    
+    
+    
+    
+# SELECT log_fact_table.date, dim_browser.browser
+# FROM log_fact_table
+# INNER JOIN dim_browser ON CAST(dim_browser.browser_id AS INTEGER) = CAST(log_fact_table.browser_id AS INTEGER);
