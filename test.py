@@ -151,6 +151,7 @@ def process_raw_data():
         
         
 def process_log_file(filename):
+    
     type = filename[-3:len(filename)]
     
     if (type == 'log'):
@@ -162,17 +163,23 @@ def process_log_file(filename):
         
         for line in lines:
             
+            # if (line[0] == '#'):
+            #     print(line)
+            
             if (line[0] != '#'):
             
                 result = process_log_line(line)
-
+                
+            
                 if result:
                     if not result.endswith('\n'):
                         result += '\n'
                         
+                    # print(result)
+                        
                     out_file.write(result)
 
-                
+    
         in_file.close()
         out_file.close()
                  
@@ -180,23 +187,32 @@ def process_log_file(filename):
 def process_log_line(line):    
     
     split = line.split(' ')
+    response_time = ''
+    status_code = ''
+    cs_bytes = '-'
+    sc_bytes = '-'
     
-
     if (len(split) == 14):
-        browser = split[9].replace(',','')
-        file_path = split[4].replace(',','')
-        out = split[0] + ',' + split[1] + ',' + split[3] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[13] 
-        return out
+        status_code = split[-4]
+        response_time = split[13]
+        # out = split[0] + ',' + split[1] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[13] 
         
     elif (len(split) == 18):  
-        browser = split[9].replace(',','')
-        file_path = split[4].replace(',','')
-        out = split[0] + ',' + split[1] + ',' + split[3] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[16]
-        return out
+        status_code = split[-6]
+        response_time = split[16]
+        sc_bytes = split[-3]
+        cs_bytes = split[-2]
+        # out = split[0] + ',' + split[1] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[16]
 
     else:
-        return None    
+        return 
     
+    browser = split[9].replace(',','')
+    file_path = split[4].replace(',','')
+
+    out = f'{split[0]},{split[1]},{split[3]},{file_path},{browser},{split[8]},{status_code},{sc_bytes},{cs_bytes},{response_time}'
+    
+    return out
     
 def status_code():
     in_file = open('src/data/staging/merged-data.txt', 'r')
@@ -204,6 +220,30 @@ def status_code():
     for line in in_file:
         
         file_path = line.split(',')[2]
+      
+      
+      
+        
+def read_data():
+    in_file = open('test-merged-data.txt', 'r')
+    
+    for line in in_file:
+        
+        split = line.split(',')
+        
+        print(len(split))
+        
+        # file_extension = split[3]
+        
+        # pattern = r'^[a-zA-Z0-9]+$'
+        
+        # if re.match(pattern, file_extension):
+        #     print(file_extension)
+        
+        # if '+' in file_extension:
+        #     # file_extension = file_extension.split('?')[0]
+        #     print(file_extension)
         
 
-process_raw_data()
+# process_raw_data()
+read_data()

@@ -72,7 +72,6 @@ def process_log_file(filename):
     if (type == 'log'):
         
         in_file = open(RAW_DATA + filename, 'r')
-        out_file_robot = open(STAGING + 'data-robot.txt', 'w')
         out_file = open(STAGING + 'merged-data.txt', 'a')
         
         lines = in_file.readlines()
@@ -87,39 +86,40 @@ def process_log_file(filename):
                     if not result.endswith('\n'):
                         result += '\n'
                     out_file.write(result)
-                else:
-                    out_file_robot.write(line)
                 
         in_file.close()
-        out_file_robot.close()
         out_file.close()
                  
-    
+  
 def process_log_line(line):    
     
-    
     split = line.split(' ')
+    response_time = ''
+    status_code = ''
+    cs_bytes = '-'
+    sc_bytes = '-'
     
-    logging.debug('Processing ', len(split))
-    
-   
     if (len(split) == 14):
-        browser = split[9].replace(',','')
-        file_path = split[4].replace(',','')
-        out = split[0] + ',' + split[1] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[13] 
-        return out
+        status_code = split[-4]
+        response_time = split[13]
         
     elif (len(split) == 18):  
-        browser = split[9].replace(',','')
-        file_path = split[4].replace(',','')
-        out = split[0] + ',' + split[1] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[16]
-        return out
+        status_code = split[-6]
+        response_time = split[16]
+        sc_bytes = split[-3]
+        cs_bytes = split[-2]
 
     else:
-        logging.debug('Fault line ' + str(len(split)))
-        return None
-         
+        return 
+    
+    browser = split[9].replace(',','')
+    file_path = split[4].replace(',','')
+
+    out = f'{split[0]},{split[1]},{split[3]},{file_path},{browser},{split[8]},{status_code},{sc_bytes},{cs_bytes},{response_time}'
+    
+    return out
             
+
 def sanitize_string(string):
     clean = re.sub(r'[^\w/.]', '', string)
     return clean
@@ -131,17 +131,30 @@ def clear_files():
     
 def insert_staging_log_data():
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    with open(STAGING + 'merged-data.txt', 'r') as file:
-        for line in file:
-            values = line.strip().split(',')
-            cursor.execute('INSERT INTO staging_log_data (date, time, file_path, browser_string, ip, response_time) VALUES (%s, %s, %s, %s, %s, %s)', values)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        with open(STAGING + 'merged-data.txt', 'r') as file:
+            for line in file:
+                values = line.strip().split(',')
+                
+                if values[-3] == '-' or values[-2] == '-':
+                    values[-3] = None
+                    values[-2] = None
+ 
+                cursor.execute('INSERT INTO staging_log_data (date, time, http_method, raw_file_path, browser_string, ip, status_code, sc_bytes, cs_bytes, response_time) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', values)
+                
+        conn.commit()
             
-    conn.commit()
-    cursor.close()
-    conn.close()
+    except Exception as e:
+        conn.rollback()
+        logging.exception(f'Error: {e}')
+        raise
+        
+    finally:
+        cursor.close()
+        conn.close()
 
 
 
@@ -442,6 +455,9 @@ def process_file_path(file_path):
 
     if file_extension == '':
         file_extension = 'undefined'  
+    
+    if '?' in file_extension:
+        file_extension = file_extension.split('?')[0]
         
     return (file_name, file_extension, file_directory)     
         
@@ -469,9 +485,13 @@ with DAG(
             log_id SERIAL PRIMARY KEY,
             date VARCHAR,
             time VARCHAR,
-            file_path VARCHAR,
+            http_method VARCHAR,
+            raw_file_path VARCHAR,
             browser_string VARCHAR,
             ip VARCHAR,
+            status_code VARCHAR,
+            sc_bytes INT,
+            cs_bytes INT,
             response_time int
         );
         """
@@ -688,6 +708,11 @@ with DAG(
             SET ip = dim.ip_id
             FROM dim_ip AS dim
             WHERE f.ip = dim.ip;
+            
+            UPDATE log_fact_table AS f
+            SET date = dim.date_id
+            FROM dim_date AS dim
+            WHERE f.date = dim.date;
             
             UPDATE log_fact_table AS f
             SET browser = dim.browser_id
