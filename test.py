@@ -231,19 +231,47 @@ def read_data():
         
         split = line.split(',')
         
-        print(len(split))
+        file_path = split[3]
         
-        # file_extension = split[3]
+        # if 'Home.aspx-com' in file_path:
         
-        # pattern = r'^[a-zA-Z0-9]+$'
+        process_file_path(file_path)
         
-        # if re.match(pattern, file_extension):
-        #     print(file_extension)
-        
-        # if '+' in file_extension:
-        #     # file_extension = file_extension.split('?')[0]
-        #     print(file_extension)
-        
+    
+def process_file_path(raw_file_path):
+
+    raw_file_path = raw_file_path.replace('+', ' ')
+    file_directory, file_name = os.path.split(raw_file_path)
+    
+    if '+++' in file_name:
+        i = file_name.find('+++')
+        file_name = file_name[:i]
+        # print(file_name)
+    
+    file_name = file_name.replace('+', '-').replace('[', '').replace(']', '')
+    file_directory = file_directory.replace('+', '-')
+    
+    if '?' in file_name:
+        i = file_name.find('?')
+        file_name = file_name[:i]
+        # print(file_name)
+ 
+    if '"' in file_name:
+        i = file_name.find('"')
+        file_name = file_name[:i]
+        # print(file_name)
+     
+    a, file_extension = os.path.splitext(file_name)
+    
+    if file_directory.endswith('/'):
+        file_path = f'{file_directory}{file_name}' 
+    else:
+        file_path = f'{file_directory}/{file_name}' 
+          
+    
+    out = (raw_file_path, file_path, file_name, file_extension, file_directory)   
+    print(out)
 
 # process_raw_data()
-read_data()
+# read_data()
+process_file_path('/Darwin/Home.aspx+com.othermedia.webkit.exceptions.Resource')

@@ -408,13 +408,14 @@ def extract_file_details():
         # Add columns to file table
         sql_query = '''
             ALTER TABLE staging_file
+            ADD COLUMN IF NOT EXISTS file_path VARCHAR,
             ADD COLUMN IF NOT EXISTS file_name VARCHAR,
             ADD COLUMN IF NOT EXISTS file_extension VARCHAR,
             ADD COLUMN IF NOT EXISTS file_directory VARCHAR;
             '''
         cursor.execute(sql_query)
         
-        cursor.execute('SELECT file_id, file_path FROM staging_file;')
+        cursor.execute('SELECT file_id, raw_file_path FROM staging_file;')
         result = cursor.fetchall()
         
         for row in result:
@@ -425,7 +426,7 @@ def extract_file_details():
             # Insert file details
             cursor.execute('''
                     UPDATE staging_file
-                    SET file_name = %s, file_extension = %s, file_directory = %s
+                    SET file_path = %s, file_name = %s, file_extension = %s, file_directory = %s
                     WHERE  file_id = %s;
                     ''', (*values, file_id))
             
@@ -441,25 +442,40 @@ def extract_file_details():
         conn.close()
         
 
-def process_file_path(file_path):
+def process_file_path(raw_file_path):
 
-    file_directory, file_name = os.path.split(file_path)
+    raw_file_path = raw_file_path.replace('+', ' ').replace('-', ' ')
+    file_directory, file_name = os.path.split(raw_file_path)
     
-    if '+' in file_name and  '"' not in file_name:
-        file_name = file_name.split('+')[0]
+    if '+++' in file_name:
+        i = file_name.find('+++')
+        file_name = file_name[:i]
+        # print(file_name)
     
+    file_name = file_name.replace('+', '-').replace('[', '').replace(']', '')
+    file_directory = file_directory.replace('+', '-')
+    
+    if '?' in file_name:
+        i = file_name.find('?')
+        file_name = file_name[:i]
+        # print(file_name)
+ 
+    if '"' in file_name:
+        i = file_name.find('"')
+        file_name = file_name[:i]
+        # print(file_name)
+     
     a, file_extension = os.path.splitext(file_name)
     
-    if file_name == '':
-        file_name = 'undefined'
-
-    if file_extension == '':
-        file_extension = 'undefined'  
+    if file_directory.endswith('/'):
+        file_path = f'{file_directory}{file_name}' 
+    else:
+        file_path = f'{file_directory}/{file_name}' 
+          
     
-    if '?' in file_extension:
-        file_extension = file_extension.split('?')[0]
+    out = (raw_file_path, file_path, file_name, file_extension, file_directory)   
         
-    return (file_name, file_extension, file_directory)     
+    return (file_path, file_name, file_extension, file_directory)     
         
 
 with DAG(
@@ -669,11 +685,11 @@ with DAG(
             
             CREATE TABLE staging_file (
                 file_id SERIAL PRIMARY KEY,
-                file_path VARCHAR
+                raw_file_path VARCHAR
             );
             
-            INSERT INTO staging_file (file_path)
-            SELECT DISTINCT file_path from staging_log_data;
+            INSERT INTO staging_file (raw_file_path)
+            SELECT DISTINCT raw_file_path from staging_log_data;
         '''
     )
     
