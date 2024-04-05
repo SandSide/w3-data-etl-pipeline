@@ -72,7 +72,6 @@ def process_log_file(filename):
     if (type == 'log'):
         
         in_file = open(RAW_DATA + filename, 'r')
-        out_file_robot = open(STAGING + 'data-robot.txt', 'w')
         out_file = open(STAGING + 'merged-data.txt', 'a')
         
         lines = in_file.readlines()
@@ -87,39 +86,40 @@ def process_log_file(filename):
                     if not result.endswith('\n'):
                         result += '\n'
                     out_file.write(result)
-                else:
-                    out_file_robot.write(line)
                 
         in_file.close()
-        out_file_robot.close()
         out_file.close()
                  
-    
+  
 def process_log_line(line):    
     
-    
     split = line.split(' ')
+    response_time = ''
+    status_code = ''
+    cs_bytes = '-'
+    sc_bytes = '-'
     
-    logging.debug('Processing ', len(split))
-    
-   
     if (len(split) == 14):
-        browser = split[9].replace(',','')
-        file_path = split[4].replace(',','')
-        out = split[0] + ',' + split[1] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[13] 
-        return out
+        status_code = split[-4]
+        response_time = split[13]
         
     elif (len(split) == 18):  
-        browser = split[9].replace(',','')
-        file_path = split[4].replace(',','')
-        out = split[0] + ',' + split[1] + ',' + file_path + ',' + browser + ',' + split[8] + ',' + split[16]
-        return out
+        status_code = split[-6]
+        response_time = split[16]
+        sc_bytes = split[-3]
+        cs_bytes = split[-2]
 
     else:
-        logging.debug('Fault line ' + str(len(split)))
-        return None
-         
+        return 
+    
+    browser = split[9].replace(',','')
+    file_path = split[4].replace(',','')
+
+    out = f'{split[0]},{split[1]},{split[3]},{file_path},{browser},{split[8]},{status_code},{sc_bytes},{cs_bytes},{response_time}'
+    
+    return out
             
+
 def sanitize_string(string):
     clean = re.sub(r'[^\w/.]', '', string)
     return clean
@@ -131,17 +131,30 @@ def clear_files():
     
 def insert_staging_log_data():
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    with open(STAGING + 'merged-data.txt', 'r') as file:
-        for line in file:
-            values = line.strip().split(',')
-            cursor.execute('INSERT INTO staging_log_data (date, time, file_path, browser_string, ip, response_time) VALUES (%s, %s, %s, %s, %s, %s)', values)
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        with open(STAGING + 'merged-data.txt', 'r') as file:
+            for line in file:
+                values = line.strip().split(',')
+                
+                if values[-3] == '-' or values[-2] == '-':
+                    values[-3] = None
+                    values[-2] = None
+ 
+                cursor.execute('INSERT INTO staging_log_data (date, time, http_method, raw_file_path, browser_string, ip, status_code, sc_bytes, cs_bytes, response_time) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', values)
+                
+        conn.commit()
             
-    conn.commit()
-    cursor.close()
-    conn.close()
+    except Exception as e:
+        conn.rollback()
+        logging.exception(f'Error: {e}')
+        raise
+        
+    finally:
+        cursor.close()
+        conn.close()
 
 
 
@@ -189,7 +202,7 @@ def determine_if_bot():
         cursor.execute(sql_query)
         
 
-        cursor.execute('SELECT log_id, file_path, browser_string FROM staging_log_data;')
+        cursor.execute('SELECT log_id, raw_file_path, browser_string FROM staging_log_data;')
         result = cursor.fetchall()
         
         for row in result:
@@ -395,13 +408,14 @@ def extract_file_details():
         # Add columns to file table
         sql_query = '''
             ALTER TABLE staging_file
+            ADD COLUMN IF NOT EXISTS file_path VARCHAR,
             ADD COLUMN IF NOT EXISTS file_name VARCHAR,
             ADD COLUMN IF NOT EXISTS file_extension VARCHAR,
             ADD COLUMN IF NOT EXISTS file_directory VARCHAR;
             '''
         cursor.execute(sql_query)
         
-        cursor.execute('SELECT file_id, file_path FROM staging_file;')
+        cursor.execute('SELECT file_id, raw_file_path FROM staging_file;')
         result = cursor.fetchall()
         
         for row in result:
@@ -412,7 +426,7 @@ def extract_file_details():
             # Insert file details
             cursor.execute('''
                     UPDATE staging_file
-                    SET file_name = %s, file_extension = %s, file_directory = %s
+                    SET file_path = %s, file_name = %s, file_extension = %s, file_directory = %s
                     WHERE  file_id = %s;
                     ''', (*values, file_id))
             
@@ -428,22 +442,46 @@ def extract_file_details():
         conn.close()
         
 
-def process_file_path(file_path):
+def process_file_path(raw_file_path):
 
-    file_directory, file_name = os.path.split(file_path)
+    file_directory, file_name = os.path.split(raw_file_path)
     
-    if '+' in file_name and  '"' not in file_name:
-        file_name = file_name.split('+')[0]
+    # Remove anything after +++
+    if '+++' in file_name:
+        i = file_name.find('+++')
+        file_name = file_name[:i]
+       
     
-    a, file_extension = os.path.splitext(file_name)
+    # Remove anything after " 
+    if '"' in file_name:
+        i = file_name.find('"')
+        file_name = file_name[:i]
     
-    if file_name == '':
-        file_name = 'undefined'
+    
+    # Remove anything after ?
+    if '?' in file_name:
+        i = file_name.find('?')
+        file_name = file_name[:i]
+    
+    
+    pattern = r'[^a-zA-Z0-9./\-\'+_]'
+    file_name = re.sub(pattern, '', file_name)
 
-    if file_extension == '':
-        file_extension = 'undefined'  
+    a, file_extension = os.path.splitext(file_name)    
+    
+    if '+' in file_extension:
+        file_extension = ''
+    
+
+    if file_directory.endswith('/'):
+        file_path = f'{file_directory}{file_name}' 
+    else:
+        file_path = f'{file_directory}/{file_name}' 
+          
+    
+    # out = (raw_file_path, file_path, file_name, file_extension, file_directory)   
         
-    return (file_name, file_extension, file_directory)     
+    return (file_path, file_name, file_extension, file_directory)  
         
 
 with DAG(
@@ -469,9 +507,13 @@ with DAG(
             log_id SERIAL PRIMARY KEY,
             date VARCHAR,
             time VARCHAR,
-            file_path VARCHAR,
+            http_method VARCHAR,
+            raw_file_path VARCHAR,
             browser_string VARCHAR,
             ip VARCHAR,
+            status_code VARCHAR,
+            sc_bytes INT,
+            cs_bytes INT,
             response_time int
         );
         """
@@ -649,11 +691,11 @@ with DAG(
             
             CREATE TABLE staging_file (
                 file_id SERIAL PRIMARY KEY,
-                file_path VARCHAR
+                raw_file_path VARCHAR
             );
             
-            INSERT INTO staging_file (file_path)
-            SELECT DISTINCT file_path from staging_log_data;
+            INSERT INTO staging_file (raw_file_path)
+            SELECT DISTINCT raw_file_path from staging_log_data;
         '''
     )
     
@@ -682,12 +724,17 @@ with DAG(
             DROP TABLE IF EXISTS log_fact_table;
             
             CREATE TABLE log_fact_table AS
-            SELECT log_id, date, time, file_path, ip, browser, os, response_time, is_bot FROM staging_log_data;
+            SELECT log_id, date, time, raw_file_path, ip, browser, os, response_time, is_bot FROM staging_log_data;
             
             UPDATE log_fact_table AS f
             SET ip = dim.ip_id
             FROM dim_ip AS dim
             WHERE f.ip = dim.ip;
+            
+            UPDATE log_fact_table AS f
+            SET date = dim.date_id
+            FROM dim_date AS dim
+            WHERE f.date = dim.date;
             
             UPDATE log_fact_table AS f
             SET browser = dim.browser_id
@@ -700,13 +747,13 @@ with DAG(
             WHERE f.os = dim.os;
             
             UPDATE log_fact_table AS f
-            SET file_path = dim.file_id
+            SET raw_file_path = dim.file_id
             FROM dim_file AS dim
-            WHERE f.file_path = dim.file_path;
+            WHERE f.raw_file_path = dim.raw_file_path;
             
             ALTER TABLE log_fact_table
             ALTER COLUMN date TYPE INT USING date::INT,
-            ALTER COLUMN file_path TYPE INT USING file_path::INT,
+            ALTER COLUMN raw_file_path TYPE INT USING raw_file_path::INT,
             ALTER COLUMN ip TYPE INT USING ip::INT,
             ALTER COLUMN browser TYPE INT USING browser::INT,
             ALTER COLUMN os TYPE INT USING os::INT;
