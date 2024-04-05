@@ -750,6 +750,17 @@ with DAG(
     )
     
     
+    build_dim_time_table_task = PostgresOperator(
+        task_id = 'build_dim_time_table',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS dim_time;
+            
+            CREATE TABLE dim_time AS
+            SELECT * FROM staging_time;
+        '''
+    )
+    
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
         task_id = 'build_fact_table',
@@ -760,25 +771,54 @@ with DAG(
             CREATE TABLE log_fact_table AS
             SELECT log_id, date, time, raw_file_path, ip, browser, os, response_time, is_bot FROM staging_log_data;
             
+            
             UPDATE log_fact_table AS f
             SET ip = dim.ip_id
             FROM dim_ip AS dim
             WHERE f.ip = dim.ip;
-            
+
+            ALTER TABLE log_fact_table
+            RENAME COLUMN ip TO ip_id;
+                
+                  
             UPDATE log_fact_table AS f
             SET date = dim.date_id
             FROM dim_date AS dim
             WHERE f.date = dim.date;
+            
+            ALTER TABLE log_fact_table
+            RENAME COLUMN date TO date_id;
+            
+ 
+            
+            UPDATE log_fact_table AS f
+            SET time = dim.time_id
+            FROM dim_time AS dim
+            WHERE f.time::TIME = dim.time;
+            
+            ALTER TABLE log_fact_table
+            RENAME COLUMN time TO time_id;
+            
+            
             
             UPDATE log_fact_table AS f
             SET browser = dim.browser_id
             FROM dim_browser AS dim
             WHERE f.browser = dim.browser;
             
+            ALTER TABLE log_fact_table
+            RENAME COLUMN browser TO browser_id;
+            
+            
+            
             UPDATE log_fact_table AS f
             SET os = dim.os_id
             FROM dim_os AS dim
             WHERE f.os = dim.os;
+            
+            ALTER TABLE log_fact_table
+            RENAME COLUMN os TO os_id;
+            
             
             UPDATE log_fact_table AS f
             SET raw_file_path = dim.file_id
@@ -786,11 +826,17 @@ with DAG(
             WHERE f.raw_file_path = dim.raw_file_path;
             
             ALTER TABLE log_fact_table
-            ALTER COLUMN date TYPE INT USING date::INT,
-            ALTER COLUMN raw_file_path TYPE INT USING raw_file_path::INT,
-            ALTER COLUMN ip TYPE INT USING ip::INT,
-            ALTER COLUMN browser TYPE INT USING browser::INT,
-            ALTER COLUMN os TYPE INT USING os::INT;
+            RENAME COLUMN raw_file_path TO file_id;
+            
+            
+
+            ALTER TABLE log_fact_table
+            ALTER COLUMN date_id TYPE INT USING date_id::INT,
+            ALTER COLUMN time_id TYPE INT USING time_id::INT,
+            ALTER COLUMN file_id TYPE INT USING file_id::INT,
+            ALTER COLUMN ip_id TYPE INT USING ip_id::INT,
+            ALTER COLUMN browser_id TYPE INT USING browser_id::INT,
+            ALTER COLUMN os_id TYPE INT USING os_id::INT;
         '''
     )
 
@@ -818,8 +864,8 @@ with DAG(
     determine_if_bot_task >> extract_unique_file_path_task >> extract_file_details_task >> build_dim_file_table_task
     
     # TIME
-    determine_if_bot_task >> extract_unique_time_task >> determine_time_details_task
+    determine_if_bot_task >> extract_unique_time_task >> determine_time_details_task >> build_dim_time_table_task
     
     
     # FACT TABLE
-    build_fact_table_task.set_upstream(task_or_task_list = [build_dim_ip_table_task, build_dim_date_table_task, build_dim_browser_table_task, build_dim_os_table_task, build_dim_file_table_task])
+    build_fact_table_task.set_upstream(task_or_task_list = [build_dim_ip_table_task, build_dim_date_table_task, build_dim_browser_table_task, build_dim_os_table_task, build_dim_file_table_task, build_dim_time_table_task])
