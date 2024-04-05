@@ -157,37 +157,72 @@ def insert_staging_log_data():
         conn.close()
 
 
-
-def update_date_with_details():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute('SELECT date FROM staging_date;')
-    dates = cursor.fetchall()
-    
-    dates = [x[0] for x in dates]
-    
-    cursor.execute('''
-        ALTER TABLE staging_date
-        ADD COLUMN year INT,
-        ADD COLUMN month INT,
-        ADD COLUMN day INT,
-        ADD COLUMN week_day VARCHAR;
-    ''')
-    
-    for date in dates:
-        result = extract_date_details(date)
+def determine_date_details():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT date FROM staging_date;')
+        dates = cursor.fetchall()
+        
+        dates = [x[0] for x in dates]
         
         cursor.execute('''
-            UPDATE staging_date 
-            SET year  = %s, month = %s, day = %s, week_day = %s
-            WHERE date = %s;
-            ''', (*result, date))
+            ALTER TABLE staging_date
+            ADD COLUMN IF NOT EXISTS year INT,
+            ADD COLUMN IF NOT EXISTS month INT,
+            ADD COLUMN IF NOT EXISTS day INT,
+            ADD COLUMN IF NOT EXISTS week_day VARCHAR,
+            ADD COLUMN IF NOT EXISTS quarter int;
+        ''')
+        
+        for date in dates:
+            result = extract_date_details(date)
+            
+            cursor.execute('''
+                UPDATE staging_date 
+                SET year  = %s, month = %s, day = %s, week_day = %s, quarter = %s
+                WHERE date = %s;
+                ''', (*result, date))
 
-    conn.commit()
-    cursor.close()
-    conn.close()
+        conn.commit()
+        
+    except Exception as e:
+        conn.rollback()
+        logging.exception(f'Error: {e}')
+        raise
+        
+    finally:
+        cursor.close()
+        conn.close()
+        
+        
+def extract_date_details(date):
+        
+    logging.debug('Extracting date details: ' + date)
+        
+    DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
     
+    try:
+        date = datetime.strptime(date,'%Y-%m-%d').date()
+        weekday = DAYS[date.weekday()]
+        
+        quarter = 1
+        
+        if date.month >= 10:
+            quarter = 4
+        elif date.month >= 7:
+            quarter = 3
+        elif date.month >= 4:
+            quarter = 2
+        else:
+            quarter = 1
+        
+        #out = str(date) + ',' + str(date.year) + ',' + str(date.month) + ',' + str(date.day) + ',' + weekday + '\n'  
+        return (date.year, date.month, date.day, weekday, quarter)
+
+    except:
+        logging.error('Error with extracting date details ' + date)
 
 def determine_if_bot():
     try:
@@ -234,24 +269,6 @@ def is_bot(browser, file_path):
     return parsed_ua.is_bot or file_path == '/robots.txt'
 
 
-
-def extract_date_details(date):
-        
-    logging.debug('Extracting date details: ' + date)
-        
-    DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']
-    
-    try:
-        date = datetime.strptime(date,'%Y-%m-%d').date()
-        weekday = DAYS[date.weekday()]
-        
-        #out = str(date) + ',' + str(date.year) + ',' + str(date.month) + ',' + str(date.day) + ',' + weekday + '\n'  
-        return (date.year, date.month, date.day, weekday)
-
-    except:
-        logging.error('Error with extracting date details ' + date)
-           
-            
 def update_ip_with_location():
         
     conn = get_db_connection()
@@ -586,9 +603,9 @@ with DAG(
         '''
     )
     
-    update_date_with_details_task = PythonOperator(
-        task_id = 'update_date_with_details',
-        python_callable = update_date_with_details, 
+    determine_date_details_task = PythonOperator(
+        task_id = 'determine_date_details',
+        python_callable = determine_date_details, 
     )
     
     build_dim_date_table_task = PostgresOperator(
@@ -602,16 +619,6 @@ with DAG(
         '''
     )
         
-    # update_staging_log_with_date_dim_task = PostgresOperator(
-    #     task_id = 'update_staging_log_with_date_id',
-    #     sql = 
-    #     '''
-    #         UPDATE staging_log_data AS f
-    #         SET date = dim.date_id
-    #         FROM dim_date AS dim
-    #         WHERE f.date = dim.date;
-    #     '''
-    # )
 
     ##### BROWSER TASKS ######
     
@@ -849,7 +856,7 @@ with DAG(
 
 
     # DATE
-    determine_if_bot_task >> extract_unique_date_task >> update_date_with_details_task >> build_dim_date_table_task
+    determine_if_bot_task >> extract_unique_date_task >> determine_date_details_task >> build_dim_date_table_task
 
 
     # BROWSER
