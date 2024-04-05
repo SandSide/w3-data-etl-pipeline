@@ -716,6 +716,24 @@ with DAG(
         '''
     )
     
+    ## TIME TASKS
+    extract_unique_time_task = PostgresOperator(
+        task_id = 'extract_unique_time',
+        sql = 
+        '''
+            DROP TABLE IF EXISTS staging_time;
+            
+            CREATE TABLE staging_time (
+                time_id SERIAL PRIMARY KEY,
+                time TIME
+            );
+            
+            INSERT INTO staging_time (time)
+            SELECT DISTINCT CAST(time AS TIME) from staging_log_data;
+        '''
+    )
+    
+    
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
         task_id = 'build_fact_table',
@@ -782,6 +800,9 @@ with DAG(
     
     # FILE
     determine_if_bot_task >> extract_unique_file_path_task >> extract_file_details_task >> build_dim_file_table_task
+    
+    # TIME
+    determine_if_bot_task >> extract_unique_time_task
     
     
     # FACT TABLE
