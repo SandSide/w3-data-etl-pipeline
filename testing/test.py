@@ -1,5 +1,6 @@
 import re
 import os
+import http.client
 
 RAW_DATA = 'src/data/W3SVC1/'
 # from user_agents import parse
@@ -283,6 +284,15 @@ def process_file_path(raw_file_path):
     return (file_path, file_name, file_extension, file_directory)  
 
 # process_raw_data()
-read_data()
+# read_data()
 # process_file_path('/Darwin/Home.aspx+com.othermedia.webkit.exceptions.Resource')
 
+
+
+# Check the type of a status code
+status_code = 404
+type_info = http.client.responses.get(status_code, 'Unknown')
+print("Type of status code", status_code, ":", type_info)
+
+description = http.client.responses[404]
+print("Description of status code 404:", description)

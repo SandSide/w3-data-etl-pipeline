@@ -22,6 +22,6 @@ ORDER BY d.hour ASC;
 
 SELECT d.week_day, COUNT(*) 
 FROM log_fact_table as f
-INNER JOIN dim_time as d ON f.time_id = d.time_id
+INNER JOIN dim_date as d ON f.date_id = d.date_id
 WHERE is_bot = 'f'
-GROUP BY d.week_day
+GROUP BY d.week_day;
