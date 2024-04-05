@@ -1,11 +1,11 @@
-import airflow
-from airflow import DAG
-from airflow.operators.bash import BashOperator
-from airflow.operators.python import PythonOperator
-from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
-from airflow.providers.postgres.operators.postgres import PostgresOperator
-from sqlalchemy import create_engine
-from airflow.models import Connection
+import airflow # type: ignore
+from airflow import DAG # type: ignore
+from airflow.operators.bash import BashOperator # type: ignore
+from airflow.operators.python import PythonOperator # type: ignore
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator # type: ignore
+from airflow.providers.postgres.operators.postgres import PostgresOperator # type: ignore
+from sqlalchemy import create_engine # type: ignore
+from airflow.models import Connection # type: ignore
 
 import os
 import csv
@@ -19,13 +19,13 @@ subprocess.call(['pip', 'install', 'user-agents'])
 from user_agents import parse
 
 
-import psycopg2
+import psycopg2 # type: ignore
 
 
 import logging
 import json
-import requests
-import requests.exceptions as requests_exceptions
+import requests # type: ignore
+import requests.exceptions as requests_exceptions # type: ignore
 
 
 
@@ -269,53 +269,56 @@ def is_bot(browser, file_path):
     return parsed_ua.is_bot or file_path == '/robots.txt'
 
 
-def update_ip_with_location():
+def determine_ip_location():
+    try: 
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    sql_query = '''
-        ALTER TABLE staging_ip
-        ADD COLUMN IF NOT EXISTS country_code VARCHAR,
-        ADD COLUMN IF NOT EXISTS country_name VARCHAR,
-        ADD COLUMN IF NOT EXISTS latitude FLOAT,
-        ADD COLUMN IF NOT EXISTS longitude FLOAT;
-    '''
-    cursor.execute(sql_query)
-    
-    
-    sql_query = """
-        SELECT ip
-        FROM staging_ip
-        WHERE country_code IS NULL OR country_name IS NULL OR latitude IS NULL OR longitude IS NULL;
-    """
-    cursor.execute(sql_query)
-    ips = cursor.fetchall()
+        sql_query = '''
+            ALTER TABLE staging_ip
+            ADD COLUMN IF NOT EXISTS country_code VARCHAR,
+            ADD COLUMN IF NOT EXISTS country_name VARCHAR,
+            ADD COLUMN IF NOT EXISTS latitude FLOAT,
+            ADD COLUMN IF NOT EXISTS longitude FLOAT;
+        '''
+        cursor.execute(sql_query)
+        
+        
+        sql_query = """
+            SELECT ip
+            FROM staging_ip
+            WHERE country_code IS NULL OR country_name IS NULL OR latitude IS NULL OR longitude IS NULL;
+        """
+        cursor.execute(sql_query)
+        ips = cursor.fetchall()
 
+        ips = [x[0] for x in ips]
+        
+        for ip in ips:
+            
+            logging.debug(f"Finding location IP: {ip}")
+            result = get_ip_location(ip)
+            
+            if result is not None and result[0] != 'Not found':
+            
+                cursor.execute('''
+                    UPDATE staging_ip
+                    SET country_code = %s, country_name = %s, latitude = %s, longitude = %s
+                    WHERE ip = %s;
+                    ''', (*result, ip))
+            else:
+                logging.debug(f"Location information not found for IP: {ip}")
 
-    ips = [x[0] for x in ips]
-    
-    print(ips)
-    
-    for ip in ips:
+        conn.commit()
         
-        logging.debug(f"Finding location IP: {ip}")
-        print(f"Finding location IP: {ip}")
-        result = get_ip_location(ip)
+    except Exception as e:
+        conn.rollback()
+        logging.exception(f'Error: {e}')
+        raise
         
-        if result is not None and result[0] != 'Not found':
-        
-            cursor.execute('''
-                UPDATE staging_ip
-                SET country_code = %s, country_name = %s, latitude = %s, longitude = %s
-                WHERE ip = %s;
-                ''', (*result, ip))
-        else:
-            logging.debug(f"Location information not found for IP: {ip}")
-
-    conn.commit()
-    cursor.close()
-    conn.close()
+    finally:
+        cursor.close()
+        conn.close()
 
         
         
@@ -340,7 +343,6 @@ def get_ip_location(ip):
         # Convert this data into a dictionary
         result  = json.loads(result)
         
-        #out = line + ',' + str(result['country_code'] ) + ',' + str(result['country_name']) + ',' + str(result['city'] ) +',' + str(result['latitude']) + ',' + str(result['longitude']) + '\n'
         return (result['country_code'], result['country_name'], result['latitude'], result['longitude'])
     
     except:
@@ -568,9 +570,9 @@ with DAG(
         '''
     )
     
-    update_ip_with_location_task = PythonOperator(
-        task_id = 'update_ip_with_location',
-        python_callable = update_ip_with_location, 
+    determine_ip_location_task = PythonOperator(
+        task_id = 'determine_ip_location',
+        python_callable = determine_ip_location, 
     )
     
 
@@ -852,27 +854,28 @@ with DAG(
     
     
     # IP
-    determine_if_bot_task >> extract_unique_ip_task >>  update_ip_with_location_task >> build_dim_ip_table_task
+    insert_staging_log_data_task >> extract_unique_ip_task >>  determine_ip_location_task >> build_dim_ip_table_task
 
 
     # DATE
-    determine_if_bot_task >> extract_unique_date_task >> determine_date_details_task >> build_dim_date_table_task
+    insert_staging_log_data_task >> extract_unique_date_task >> determine_date_details_task >> build_dim_date_table_task
 
 
     # BROWSER
-    determine_if_bot_task >> determine_browser_task >> extract_unique_browser_task >> build_dim_browser_table_task
+    insert_staging_log_data_task >> determine_browser_task >> extract_unique_browser_task >> build_dim_browser_table_task
     
     
     # OS
-    determine_if_bot_task >> determine_os_task >> extract_unique_os_task >> build_dim_os_table_task
+    insert_staging_log_data_task >> determine_os_task >> extract_unique_os_task >> build_dim_os_table_task
     
     
     # FILE
-    determine_if_bot_task >> extract_unique_file_path_task >> extract_file_details_task >> build_dim_file_table_task
+    insert_staging_log_data_task >> extract_unique_file_path_task >> extract_file_details_task >> build_dim_file_table_task
+    
     
     # TIME
-    determine_if_bot_task >> extract_unique_time_task >> determine_time_details_task >> build_dim_time_table_task
+    insert_staging_log_data_task >> extract_unique_time_task >> determine_time_details_task >> build_dim_time_table_task
     
     
     # FACT TABLE
-    build_fact_table_task.set_upstream(task_or_task_list = [build_dim_ip_table_task, build_dim_date_table_task, build_dim_browser_table_task, build_dim_os_table_task, build_dim_file_table_task, build_dim_time_table_task])
+    build_fact_table_task.set_upstream(task_or_task_list = [determine_if_bot_task, build_dim_ip_table_task, build_dim_date_table_task, build_dim_browser_table_task, build_dim_os_table_task, build_dim_file_table_task, build_dim_time_table_task])
