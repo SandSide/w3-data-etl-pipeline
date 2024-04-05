@@ -732,6 +732,22 @@ with DAG(
             SELECT DISTINCT CAST(time AS TIME) from staging_log_data;
         '''
     )
+        
+    determine_time_details_task = PostgresOperator(
+        task_id = 'determine_time_details',
+        sql = 
+        '''
+            ALTER TABLE staging_time
+            ADD COLUMN IF NOT EXISTS hour INT,
+            ADD COLUMN IF NOT EXISTS minute INT,
+            ADD COLUMN IF NOT EXISTS second INT;
+            
+            UPDATE staging_time
+            SET hour = EXTRACT(HOUR FROM time),
+                minute = EXTRACT(MINUTE FROM time),
+                second = EXTRACT(SECOND FROM time);
+        '''
+    )
     
     
     ##### FACT TASKS ######
@@ -802,7 +818,7 @@ with DAG(
     determine_if_bot_task >> extract_unique_file_path_task >> extract_file_details_task >> build_dim_file_table_task
     
     # TIME
-    determine_if_bot_task >> extract_unique_time_task
+    determine_if_bot_task >> extract_unique_time_task >> determine_time_details_task
     
     
     # FACT TABLE
