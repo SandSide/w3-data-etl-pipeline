@@ -232,46 +232,57 @@ def read_data():
         split = line.split(',')
         
         file_path = split[3]
+
         
-        # if 'Home.aspx-com' in file_path:
+        valid = bool(re.match(r'^[a-zA-Z0-9.\-_/= ]+$', file_path))
         
-        process_file_path(file_path)
+        if not valid:
+            result = process_file_path(file_path)
+            print(f'{file_path} = {result}')
         
     
 def process_file_path(raw_file_path):
 
-    raw_file_path = raw_file_path.replace('+', ' ')
     file_directory, file_name = os.path.split(raw_file_path)
     
+    # Remove anything after +++
     if '+++' in file_name:
         i = file_name.find('+++')
         file_name = file_name[:i]
-        # print(file_name)
+       
     
-    file_name = file_name.replace('+', '-').replace('[', '').replace(']', '')
-    file_directory = file_directory.replace('+', '-')
-    
-    if '?' in file_name:
-        i = file_name.find('?')
-        file_name = file_name[:i]
-        # print(file_name)
- 
+    # Remove anything after " 
     if '"' in file_name:
         i = file_name.find('"')
         file_name = file_name[:i]
-        # print(file_name)
-     
-    a, file_extension = os.path.splitext(file_name)
     
+    
+    # Remove anything after ?
+    if '?' in file_name:
+        i = file_name.find('?')
+        file_name = file_name[:i]
+    
+    
+    pattern = r'[^a-zA-Z0-9./\-\'+_]'
+    file_name = re.sub(pattern, '', file_name)
+
+    a, file_extension = os.path.splitext(file_name)    
+    
+    if '+' in file_extension:
+        file_extension = ''
+    
+
     if file_directory.endswith('/'):
         file_path = f'{file_directory}{file_name}' 
     else:
         file_path = f'{file_directory}/{file_name}' 
           
     
-    out = (raw_file_path, file_path, file_name, file_extension, file_directory)   
-    print(out)
+    # out = (raw_file_path, file_path, file_name, file_extension, file_directory)   
+        
+    return (file_path, file_name, file_extension, file_directory)  
 
 # process_raw_data()
-# read_data()
-process_file_path('/Darwin/Home.aspx+com.othermedia.webkit.exceptions.Resource')
+read_data()
+# process_file_path('/Darwin/Home.aspx+com.othermedia.webkit.exceptions.Resource')
+

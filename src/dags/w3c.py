@@ -202,7 +202,7 @@ def determine_if_bot():
         cursor.execute(sql_query)
         
 
-        cursor.execute('SELECT log_id, file_path, browser_string FROM staging_log_data;')
+        cursor.execute('SELECT log_id, raw_file_path, browser_string FROM staging_log_data;')
         result = cursor.fetchall()
         
         for row in result:
@@ -444,38 +444,44 @@ def extract_file_details():
 
 def process_file_path(raw_file_path):
 
-    raw_file_path = raw_file_path.replace('+', ' ').replace('-', ' ')
     file_directory, file_name = os.path.split(raw_file_path)
     
+    # Remove anything after +++
     if '+++' in file_name:
         i = file_name.find('+++')
         file_name = file_name[:i]
-        # print(file_name)
+       
     
-    file_name = file_name.replace('+', '-').replace('[', '').replace(']', '')
-    file_directory = file_directory.replace('+', '-')
-    
-    if '?' in file_name:
-        i = file_name.find('?')
-        file_name = file_name[:i]
-        # print(file_name)
- 
+    # Remove anything after " 
     if '"' in file_name:
         i = file_name.find('"')
         file_name = file_name[:i]
-        # print(file_name)
-     
-    a, file_extension = os.path.splitext(file_name)
     
+    
+    # Remove anything after ?
+    if '?' in file_name:
+        i = file_name.find('?')
+        file_name = file_name[:i]
+    
+    
+    pattern = r'[^a-zA-Z0-9./\-\'+_]'
+    file_name = re.sub(pattern, '', file_name)
+
+    a, file_extension = os.path.splitext(file_name)    
+    
+    if '+' in file_extension:
+        file_extension = ''
+    
+
     if file_directory.endswith('/'):
         file_path = f'{file_directory}{file_name}' 
     else:
         file_path = f'{file_directory}/{file_name}' 
           
     
-    out = (raw_file_path, file_path, file_name, file_extension, file_directory)   
+    # out = (raw_file_path, file_path, file_name, file_extension, file_directory)   
         
-    return (file_path, file_name, file_extension, file_directory)     
+    return (file_path, file_name, file_extension, file_directory)  
         
 
 with DAG(
@@ -718,7 +724,7 @@ with DAG(
             DROP TABLE IF EXISTS log_fact_table;
             
             CREATE TABLE log_fact_table AS
-            SELECT log_id, date, time, file_path, ip, browser, os, response_time, is_bot FROM staging_log_data;
+            SELECT log_id, date, time, raw_file_path, ip, browser, os, response_time, is_bot FROM staging_log_data;
             
             UPDATE log_fact_table AS f
             SET ip = dim.ip_id
@@ -741,13 +747,13 @@ with DAG(
             WHERE f.os = dim.os;
             
             UPDATE log_fact_table AS f
-            SET file_path = dim.file_id
+            SET raw_file_path = dim.file_id
             FROM dim_file AS dim
-            WHERE f.file_path = dim.file_path;
+            WHERE f.raw_file_path = dim.raw_file_path;
             
             ALTER TABLE log_fact_table
             ALTER COLUMN date TYPE INT USING date::INT,
-            ALTER COLUMN file_path TYPE INT USING file_path::INT,
+            ALTER COLUMN raw_file_path TYPE INT USING raw_file_path::INT,
             ALTER COLUMN ip TYPE INT USING ip::INT,
             ALTER COLUMN browser TYPE INT USING browser::INT,
             ALTER COLUMN os TYPE INT USING os::INT;
