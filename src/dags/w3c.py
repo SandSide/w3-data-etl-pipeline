@@ -15,20 +15,23 @@ subprocess.call(['pip', 'install', 'user-agents'])
 from user_agents import parse
 
 
+# from common_package import db_conn
+import sys
+sys.path.append('/opt/airflow') # Or os.getcwd() for this directory
+
 import logging
 import json
 import requests # type: ignore
 
 
-from db_conn import get_db_connection
-from process_raw_data import define_process_raw_data_tasks
-from bot_tasks import define_bot_tasks
-from date_tasks import define_date_tasks
-from time_tasks import define_time_tasks
-from ip_tasks import define_ip_tasks
-from browser_tasks import define_browser_tasks
-from os_tasks import define_os_tasks
-from file_path_tasks import define_file_path_tasks
+from common_package.process_raw_data import define_process_raw_data_tasks
+from common_package.bot_tasks import define_bot_tasks
+from common_package.date_tasks import define_date_tasks
+from common_package.time_tasks import define_time_tasks
+from common_package.ip_tasks import define_ip_tasks
+from common_package.browser_tasks import define_browser_tasks
+from common_package.os_tasks import define_os_tasks
+from common_package.file_path_tasks import define_file_path_tasks
 
 
 with DAG(
