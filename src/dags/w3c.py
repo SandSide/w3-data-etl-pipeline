@@ -19,14 +19,13 @@ subprocess.call(['pip', 'install', 'user-agents'])
 from user_agents import parse
 
 
-import psycopg2 # type: ignore
+
 
 
 import logging
 import json
 import requests # type: ignore
 import requests.exceptions as requests_exceptions # type: ignore
-
 
 
 # Global variables
@@ -36,16 +35,7 @@ STAGING = BASE_DIR + '/staging/'
 STAR_SCHEMA = BASE_DIR + '/star-schema/'
 
 
-
-def get_db_connection():
-    conn = psycopg2.connect(
-        dbname='airflow',
-        user='airflow',
-        password='airflow',
-        host='postgres',
-        port='5432'
-    )
-    return conn
+from db_conn import get_db_connection
 
 
 def process_raw_data():
@@ -120,11 +110,6 @@ def process_log_line(line):
     return out
             
 
-def sanitize_string(string):
-    clean = re.sub(r'[^\w/.]', '', string)
-    return clean
-   
-     
 def clear_files():
     out_file_long = open(STAGING + 'merged-data.txt', 'w')
     
