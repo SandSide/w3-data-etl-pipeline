@@ -23,8 +23,9 @@ import requests # type: ignore
 from db_conn import get_db_connection
 from process_raw_data import define_process_raw_data_tasks
 from bot_tasks import define_bot_tasks
-from ip_tasks import define_ip_tasks
 from date_tasks import define_date_tasks
+from time_tasks import define_time_tasks
+from ip_tasks import define_ip_tasks
 from browser_tasks import define_browser_tasks
 from os_tasks import define_os_tasks
 from file_path_tasks import define_file_path_tasks
@@ -52,51 +53,9 @@ with DAG(
  
     extract_unique_file_path_task, extract_file_details_task, build_dim_file_table_task = define_file_path_tasks(dag)
 
-
+    extract_unique_time_task, determine_time_details_task, build_dim_time_table_task = define_time_tasks(dag)
     ## TIME TASKS
-    extract_unique_time_task = PostgresOperator(
-        task_id = 'extract_unique_time',
-        sql = 
-        '''
-            DROP TABLE IF EXISTS staging_time;
-            
-            CREATE TABLE staging_time (
-                time_id SERIAL PRIMARY KEY,
-                time TIME
-            );
-            
-            INSERT INTO staging_time (time)
-            SELECT DISTINCT CAST(time AS TIME) from staging_log_data;
-        '''
-    )
-        
-    determine_time_details_task = PostgresOperator(
-        task_id = 'determine_time_details',
-        sql = 
-        '''
-            ALTER TABLE staging_time
-            ADD COLUMN IF NOT EXISTS hour INT,
-            ADD COLUMN IF NOT EXISTS minute INT,
-            ADD COLUMN IF NOT EXISTS second INT;
-            
-            UPDATE staging_time
-            SET hour = EXTRACT(HOUR FROM time),
-                minute = EXTRACT(MINUTE FROM time),
-                second = EXTRACT(SECOND FROM time);
-        '''
-    )
-    
-    
-    build_dim_time_table_task = PostgresOperator(
-        task_id = 'build_dim_time_table',
-        sql = 
-        '''
-            DROP TABLE IF EXISTS dim_time;
-            
-            CREATE TABLE dim_time AS
-            SELECT * FROM staging_time;
-        '''
-    )
+
     
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
