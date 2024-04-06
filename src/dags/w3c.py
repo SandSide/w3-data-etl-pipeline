@@ -26,42 +26,7 @@ from bot_tasks import define_bot_tasks
 from ip_tasks import define_ip_tasks
 from date_tasks import define_date_tasks
 from browser_tasks import define_browser_tasks
-
-
-
-def determine_os():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # Add os column
-    sql_query = '''
-        ALTER TABLE staging_log_data
-        ADD COLUMN IF NOT EXISTS os VARCHAR;
-    '''
-    cursor.execute(sql_query)
-    
-    
-    cursor.execute('SELECT log_id, browser_string FROM staging_log_data;')
-    result = cursor.fetchall()
-    
-    for log in result:
-        
-        log_id, browser = log
-        
-        # Get details from browser string
-        parsed_ua = parse(browser)
-        os = parsed_ua.os.family
-
-        # Update table
-        cursor.execute('''
-            UPDATE staging_log_data 
-            SET os = %s
-            WHERE log_id = %s;
-            ''', (os, log_id))
-        
-    conn.commit()
-    cursor.close()
-    conn.close()    
+from os_tasks import define_os_tasks
 
 
 def extract_file_details():
@@ -166,42 +131,8 @@ with DAG(
 
     determine_browser_task, extract_unique_browser_task, build_dim_browser_table_task = define_browser_tasks(dag)
 
-    
-    
-    ##### OS TASKS ######  
-    
-    determine_os_task = PythonOperator(
-        task_id = 'determine_os',
-        python_callable = determine_os,
-    )
-    
-    extract_unique_os_task = PostgresOperator(
-        task_id = 'extract_unique_os',
-        sql = 
-        '''
-            DROP TABLE IF EXISTS staging_os;
-            
-            CREATE TABLE staging_os (
-                os_id SERIAL PRIMARY KEY,
-                os VARCHAR
-            );
-            
-            INSERT INTO staging_os (os)
-            SELECT DISTINCT os from staging_log_data;
-        '''
-    )
-    
-    build_dim_os_table_task = PostgresOperator(
-        task_id = 'build_dim_os_table',
-        sql = 
-        '''
-            DROP TABLE IF EXISTS dim_os;
-            
-            CREATE TABLE dim_os AS
-            SELECT * FROM staging_os;
-        '''
-    )
-    
+    determine_os_task, extract_unique_os_task, build_dim_os_table_task = define_os_tasks(dag)
+ 
     ## FILE TASKS
     
     extract_unique_file_path_task = PostgresOperator(
