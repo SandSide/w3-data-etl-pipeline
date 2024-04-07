@@ -7,3 +7,4 @@
 src/logs/dag_processor_manager/dag_processor_manager.log
 test-merged-data.txt
 /src/dags/__pycache__
+/src/common_package/__pycache__
