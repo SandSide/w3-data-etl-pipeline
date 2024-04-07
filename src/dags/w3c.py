@@ -32,6 +32,7 @@ from common_package.ip_tasks import *
 from common_package.browser_tasks import *
 from common_package.os_tasks import *
 from common_package.file_path_tasks import *
+from common_package.status_code_tasks import *
 
 
 with DAG(
@@ -175,6 +176,12 @@ with DAG(
         sql = build_dim_time_table_query,
         dag = dag
     )
+    
+    extract_unique_status_code_task = PostgresOperator(
+        task_id = 'extract_unique_status_code',
+        sql = extract_unique_status_code_query,
+        dag = dag
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -281,6 +288,10 @@ with DAG(
     
     # TIME
     insert_staging_log_data_task >> extract_unique_time_task >> determine_time_details_task >> build_dim_time_table_task
+    
+    
+    # STATUS CODE
+    insert_staging_log_data_task >> extract_unique_status_code_task
     
     
     # FACT TABLE
