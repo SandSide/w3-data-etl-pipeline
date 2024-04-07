@@ -182,6 +182,11 @@ with DAG(
         sql = extract_unique_status_code_query,
         dag = dag
     )
+    
+    determine_status_code_details_task = PythonOperator(
+        task_id = 'determine_status_code_details',
+        python_callable = determine_status_code_details
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -291,7 +296,7 @@ with DAG(
     
     
     # STATUS CODE
-    insert_staging_log_data_task >> extract_unique_status_code_task
+    insert_staging_log_data_task >> extract_unique_status_code_task >> determine_status_code_details_task
     
     
     # FACT TABLE
