@@ -77,15 +77,15 @@ def get_status_code_details(status_code):
     
 def get_status_code_type(status_code):
     
-    if status_code > 500:
+    if status_code >= 500:
         return 'server error'
-    elif status_code > 400:
+    elif status_code >= 400:
         return 'client error'
-    elif status_code > 300:
+    elif status_code >= 300:
         return 'redirection'
-    elif status_code > 200:
+    elif status_code >= 200:
         return 'success'
-    elif status_code > 100:
+    elif status_code >= 100:
         return 'informational'
     
     
