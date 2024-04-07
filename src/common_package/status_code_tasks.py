@@ -87,3 +87,14 @@ def get_status_code_type(status_code):
         return 'success'
     elif status_code > 100:
         return 'informational'
+    
+    
+build_dim_status_code_table_query = '''
+    DROP TABLE IF EXISTS 
+        dim_status_code;
+    
+    CREATE TABLE 
+        dim_status_code 
+    AS
+        SELECT * FROM staging_status_code;
+'''
