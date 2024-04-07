@@ -32,6 +32,7 @@ from common_package.ip_tasks import *
 from common_package.browser_tasks import *
 from common_package.os_tasks import *
 from common_package.file_path_tasks import *
+from common_package.status_code_tasks import *
 
 
 with DAG(
@@ -175,16 +176,39 @@ with DAG(
         sql = build_dim_time_table_query,
         dag = dag
     )
+    
+    extract_unique_status_code_task = PostgresOperator(
+        task_id = 'extract_unique_status_code',
+        sql = extract_unique_status_code_query,
+        dag = dag
+    )
+    
+    determine_status_code_details_task = PythonOperator(
+        task_id = 'determine_status_code_details',
+        python_callable = determine_status_code_details
+    )
+
+    build_dim_status_code_table_task = PostgresOperator(
+        task_id = 'build_dim_status_code_table',
+        sql = build_dim_status_code_table_query,
+        dag = dag
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
         task_id = 'build_fact_table',
         sql = 
         '''
-            DROP TABLE IF EXISTS log_fact_table;
+            DROP TABLE IF EXISTS 
+                log_fact_table;
             
-            CREATE TABLE log_fact_table AS
-            SELECT log_id, date, time, raw_file_path, ip, browser, os, response_time, is_bot FROM staging_log_data;
+            CREATE TABLE 
+                log_fact_table 
+            AS
+                SELECT 
+                    log_id, date, time, raw_file_path, ip, browser, os, status_code, response_time, is_bot 
+                FROM 
+                    staging_log_data;
             
             
             UPDATE log_fact_table AS f
@@ -244,6 +268,20 @@ with DAG(
             RENAME COLUMN raw_file_path TO file_id;
             
             
+            UPDATE 
+                log_fact_table AS f
+            SET 
+                status_code = dim.status_code_id
+            FROM 
+                dim_status_code AS dim
+            WHERE 
+                f.status_code::INT = dim.status_code;
+            
+            ALTER TABLE 
+                log_fact_table
+            RENAME COLUMN 
+                status_code TO status_code_id;
+            
 
             ALTER TABLE log_fact_table
             ALTER COLUMN date_id TYPE INT USING date_id::INT,
@@ -251,7 +289,8 @@ with DAG(
             ALTER COLUMN file_id TYPE INT USING file_id::INT,
             ALTER COLUMN ip_id TYPE INT USING ip_id::INT,
             ALTER COLUMN browser_id TYPE INT USING browser_id::INT,
-            ALTER COLUMN os_id TYPE INT USING os_id::INT;
+            ALTER COLUMN os_id TYPE INT USING os_id::INT,
+            ALTER COLUMN status_code_id TYPE INT USING status_code_id::INT;
         '''
     )
 
@@ -283,5 +322,21 @@ with DAG(
     insert_staging_log_data_task >> extract_unique_time_task >> determine_time_details_task >> build_dim_time_table_task
     
     
+    # STATUS CODE
+    insert_staging_log_data_task >> extract_unique_status_code_task >> determine_status_code_details_task >> build_dim_status_code_table_task
+    
+    
     # FACT TABLE
-    build_fact_table_task.set_upstream(task_or_task_list = [determine_if_bot_task, build_dim_ip_table_task, build_dim_date_table_task, build_dim_browser_table_task, build_dim_os_table_task, build_dim_file_table_task, build_dim_time_table_task])
+    fact_table_dependencies = [
+        determine_if_bot_task, 
+        build_dim_ip_table_task, 
+        build_dim_date_table_task, 
+        build_dim_browser_table_task, 
+        build_dim_os_table_task, 
+        build_dim_file_table_task, 
+        build_dim_time_table_task, 
+        build_dim_status_code_table_task
+    ]
+    
+    
+    build_fact_table_task.set_upstream(task_or_task_list = fact_table_dependencies)

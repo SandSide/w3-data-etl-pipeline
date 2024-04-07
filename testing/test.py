@@ -1,6 +1,6 @@
 import re
 import os
-import http.client
+import http
 
 RAW_DATA = 'src/data/W3SVC1/'
 # from user_agents import parse
@@ -290,9 +290,39 @@ def process_file_path(raw_file_path):
 
 
 # Check the type of a status code
-status_code = 404
-type_info = http.client.responses.get(status_code, 'Unknown')
-print("Type of status code", status_code, ":", type_info)
+# status_code = 404
+# type_info = http.client.responses.get(status_code, 'Unknown')
+# print("Type of status code", status_code, ":", type_info)
 
-description = http.client.responses[404]
-print("Description of status code 404:", description)
+# description = http.client.responses[404]
+# print("Description of status code 404:", description)
+
+
+def get_status_code_details(status_code):
+    
+    try:
+        status_info = http.HTTPStatus(status_code)
+        status_type = get_status_code_type(status_code)
+        return (status_info.phrase, status_type, status_info.description)
+
+        
+        
+    except ValueError:
+        return None
+    
+def get_status_code_type(status_code):
+    
+    if status_code > 500:
+        return 'server error'
+    elif status_code > 400:
+        return 'client error'
+    elif status_code > 300:
+        return 'redirection'
+    elif status_code > 200:
+        return 'success'
+    elif status_code > 100:
+        return 'informational'
+    
+    
+result = get_status_code_details(0)
+print(result)
