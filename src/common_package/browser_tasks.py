@@ -40,17 +40,8 @@ def determine_browser():
     cursor.close()
     conn.close() 
 
-def define_browser_tasks(dag):
-    determine_browser_task = PythonOperator(
-        task_id = 'determine_browser',
-        python_callable = determine_browser,
-        dag = dag
-    )
-    
-    extract_unique_browser_task = PostgresOperator(
-        task_id = 'extract_unique_browser',
-        sql = 
-        '''
+
+extract_unique_browser_query = '''
             DROP TABLE IF EXISTS staging_browser;
             
             CREATE TABLE staging_browser (
@@ -60,20 +51,11 @@ def define_browser_tasks(dag):
             
             INSERT INTO staging_browser (browser)
             SELECT DISTINCT browser from staging_log_data;
-        ''',
-        dag = dag
-    )
-    
-    build_dim_browser_table_task = PostgresOperator(
-        task_id = 'build_dim_browser_table',
-        sql = 
         '''
+
+build_dim_browser_table_query = '''
             DROP TABLE IF EXISTS dim_browser;
             
             CREATE TABLE dim_browser AS
             SELECT * FROM staging_browser;
-        ''',
-        dag = dag
-    )
-    
-    return determine_browser_task, extract_unique_browser_task, build_dim_browser_table_task
+        '''

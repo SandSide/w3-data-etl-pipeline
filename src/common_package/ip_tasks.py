@@ -89,11 +89,7 @@ def get_ip_location(ip):
         logging.exception('error getting location')
 
 
-def define_ip_tasks(dag):
-    extract_unique_ip_task = PostgresOperator(
-        task_id = 'extract_unique_ip',
-        sql = 
-        ''' 
+extract_unique_ip_query = ''' 
             CREATE TABLE IF NOT EXISTS staging_ip(
                 ip_id SERIAL PRIMARY KEY,
                 ip VARCHAR
@@ -107,27 +103,11 @@ def define_ip_tasks(dag):
                 FROM staging_ip 
                 WHERE staging_ip.ip = staging_log_data.ip
             ); 
-        ''',
-        dag = dag
-    )
-    
-    determine_ip_location_task = PythonOperator(
-        task_id = 'determine_ip_location',
-        python_callable = determine_ip_location, 
-        dag = dag
-    )
-    
-
-    build_dim_ip_table_task = PostgresOperator(
-        task_id = 'build_dim_ip_table',
-        sql = 
         '''
+
+build_dim_ip_table_query = '''
             DROP TABLE IF EXISTS dim_ip;
             
             CREATE TABLE dim_ip AS
             SELECT * FROM staging_ip;
-        ''',
-        dag = dag
-    )
-    
-    return extract_unique_ip_task, determine_ip_location_task, build_dim_ip_table_task
+        '''

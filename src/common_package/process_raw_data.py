@@ -117,19 +117,8 @@ def insert_staging_log_data():
     finally:
         cursor.close()
         conn.close()
-        
-def define_process_raw_data_tasks(dag):
-    
-    extract_raw_data_task = PythonOperator(
-        task_id = 'extract_log_data',
-        python_callable = process_raw_data, 
-        dag = dag
-    )
-    
-    
-    create_staging_log_data_table_task = PostgresOperator(
-        task_id = 'create_staging_log_data_table',
-        sql = f"""
+  
+create_staging_log_data_table_query = '''
         DROP TABLE IF EXISTS staging_log_data;
         
         CREATE TABLE staging_log_data(
@@ -145,14 +134,4 @@ def define_process_raw_data_tasks(dag):
             cs_bytes INT,
             response_time int
         );
-        """,
-        dag = dag
-    )
-    
-    insert_staging_log_data_task = PythonOperator(
-        task_id = 'insert_log_data',
-        python_callable = insert_staging_log_data,
-        dag = dag
-    )
-    
-    return extract_raw_data_task, create_staging_log_data_table_task, insert_staging_log_data_task
+'''      

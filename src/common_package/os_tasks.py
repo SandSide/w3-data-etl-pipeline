@@ -39,19 +39,8 @@ def determine_os():
     conn.commit()
     cursor.close()
     conn.close()    
-    
-
-def define_os_tasks(dag):
-    determine_os_task = PythonOperator(
-        task_id = 'determine_os',
-        python_callable = determine_os,
-        dag = dag
-    )
-    
-    extract_unique_os_task = PostgresOperator(
-        task_id = 'extract_unique_os',
-        sql = 
-        '''
+   
+extract_unique_os_query = '''
             DROP TABLE IF EXISTS staging_os;
             
             CREATE TABLE staging_os (
@@ -61,20 +50,11 @@ def define_os_tasks(dag):
             
             INSERT INTO staging_os (os)
             SELECT DISTINCT os from staging_log_data;
-        ''',
-        dag = dag
-    )
-    
-    build_dim_os_table_task = PostgresOperator(
-        task_id = 'build_dim_os_table',
-        sql = 
-        '''
+        ''' 
+
+build_dim_os_query =  '''
             DROP TABLE IF EXISTS dim_os;
             
             CREATE TABLE dim_os AS
             SELECT * FROM staging_os;
-        ''',
-        dag = dag
-    )
-    
-    return determine_os_task, extract_unique_os_task, build_dim_os_table_task
+        '''  

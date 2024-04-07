@@ -92,11 +92,7 @@ def process_file_path(raw_file_path):
         
     return (file_path, file_name, file_extension, file_directory) 
 
-def define_file_path_tasks(dag):
-    extract_unique_file_path_task = PostgresOperator(
-        task_id = 'extract_unique_file_path',
-        sql = 
-        '''
+extract_unique_file_path_query = '''
             DROP TABLE IF EXISTS staging_file;
             
             CREATE TABLE staging_file (
@@ -106,27 +102,11 @@ def define_file_path_tasks(dag):
             
             INSERT INTO staging_file (raw_file_path)
             SELECT DISTINCT raw_file_path from staging_log_data;
-        ''',
-        dag = dag
-    )
-    
-    extract_file_details_task = PythonOperator(
-        task_id = 'extract_file_details',
-        python_callable = extract_file_details,
-        dag = dag
-    )
-    
-    
-    build_dim_file_table_task = PostgresOperator(
-        task_id = 'build_dim_file_table',
-        sql = 
         '''
+        
+build_dim_file_query = '''
             DROP TABLE IF EXISTS dim_file;
             
             CREATE TABLE dim_file AS
             SELECT * FROM staging_file;
-        ''',
-        dag = dag
-    )
-    
-    return extract_unique_file_path_task, extract_file_details_task, build_dim_file_table_task
+        '''

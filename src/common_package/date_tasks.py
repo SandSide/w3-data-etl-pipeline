@@ -75,12 +75,7 @@ def extract_date_details(date):
         logging.error('Error with extracting date details ' + date)
         
 
-def define_date_tasks(dag):
-    
-    extract_unique_date_task = PostgresOperator(
-        task_id = 'extract_unique_date',
-        sql = 
-        '''
+extract_unique_date_query = '''
             DROP TABLE IF EXISTS staging_date;
             
             CREATE TABLE staging_date (
@@ -90,26 +85,11 @@ def define_date_tasks(dag):
             
             INSERT INTO staging_date (date)
             SELECT DISTINCT date from staging_log_data;
-        ''',
-        dag = dag
-    )
-    
-    determine_date_details_task = PythonOperator(
-        task_id = 'determine_date_details',
-        python_callable = determine_date_details, 
-        dag = dag
-    )
-    
-    build_dim_date_table_task = PostgresOperator(
-        task_id = 'build_dim_date_table',
-        sql = 
         '''
+
+create_dim_date_table_query =  '''
             DROP TABLE IF EXISTS dim_date;
             
             CREATE TABLE dim_date AS
             SELECT * FROM staging_date;
-        ''',
-        dag = dag
-    )
-    
-    return extract_unique_date_task, determine_date_details_task, build_dim_date_table_task
+        '''

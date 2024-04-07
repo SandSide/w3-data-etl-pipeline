@@ -51,13 +51,3 @@ def determine_if_bot():
 def is_bot(browser, file_path):
     parsed_ua = parse(browser)
     return parsed_ua.is_bot or file_path == '/robots.txt'
-
-
-def define_bot_tasks(dag):
-    determine_if_bot_task = PythonOperator(
-        task_id = 'determine_if_bot',
-        python_callable = determine_if_bot,
-        dag = dag
-    )
-    
-    return determine_if_bot_task
