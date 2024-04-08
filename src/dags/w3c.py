@@ -34,7 +34,11 @@ from common_package.os_tasks import *
 from common_package.file_path_tasks import *
 from common_package.status_code_tasks import *
 from common_package.http_method_tasks import *
-
+from common_package.time_taken_tasks import (
+    extract_unique_time_taken_query,
+    categorize_time_taken,
+    build_dim_time_taken_query
+)
 
 with DAG(
     dag_id = 'Process_W3_Data',                          
@@ -205,6 +209,21 @@ with DAG(
         sql = build_dim_http_method_table_query
     )
 
+    extract_unique_time_taken_task = PostgresOperator(
+        task_id = 'extract_unique_time_taken',
+        sql = extract_unique_time_taken_query
+    )
+    
+    categorize_time_taken_task = PythonOperator(
+        task_id = 'categorize_time_taken',
+        python_callable = categorize_time_taken
+    )
+
+    build_dim_time_taken_table_task = PostgresOperator(
+        task_id = 'build_dim_time_taken_table',
+        sql = build_dim_time_taken_query
+    )
+
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
         task_id = 'build_fact_table',
@@ -217,7 +236,7 @@ with DAG(
                 log_fact_table 
             AS
                 SELECT 
-                    log_id, date, time, http_method, raw_file_path, ip, browser, os, status_code, response_time, is_bot 
+                    log_id, date, time, http_method, raw_file_path, ip, browser, os, status_code, time_taken, is_bot 
                 FROM 
                     staging_log_data
             ORDER BY
@@ -309,6 +328,22 @@ with DAG(
                 log_fact_table
             RENAME COLUMN 
                 http_method TO http_method_id;         
+
+
+
+            UPDATE 
+                log_fact_table AS f
+            SET 
+                time_taken = dim.time_taken_id
+            FROM 
+                dim_time_taken AS dim
+            WHERE 
+                f.time_taken = dim.time_taken;
+            
+            ALTER TABLE 
+                log_fact_table
+            RENAME COLUMN 
+                time_taken TO time_taken_id; 
  
 
             ALTER TABLE log_fact_table
@@ -359,6 +394,10 @@ with DAG(
     insert_staging_log_data_task >> extract_unique_http_method_task >> build_dim_http_method_table_task
     
     
+    # TIME TAKEN
+    insert_staging_log_data_task >> extract_unique_time_taken_task >> categorize_time_taken_task >> build_dim_time_taken_table_task
+    
+    
     # FACT TABLE
     fact_table_dependencies = [
         determine_if_bot_task, 
@@ -369,7 +408,8 @@ with DAG(
         build_dim_file_table_task, 
         build_dim_time_table_task, 
         build_dim_status_code_table_task,
-        build_dim_http_method_table_task
+        build_dim_http_method_table_task,
+        build_dim_time_taken_table_task
     ]
     
     
