@@ -34,7 +34,7 @@ from common_package.os_tasks import *
 from common_package.file_path_tasks import *
 from common_package.status_code_tasks import *
 from common_package.http_method_tasks import *
-
+from common_package.time_taken_tasks import *
 
 with DAG(
     dag_id = 'Process_W3_Data',                          
@@ -205,6 +205,12 @@ with DAG(
         sql = build_dim_http_method_table_query
     )
 
+    extract_unique_time_taken_task = PostgresOperator(
+        task_id = 'extract_unique_time_taken',
+        sql = extract_unique_time_taken_query
+    )
+
+
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
         task_id = 'build_fact_table',
@@ -357,6 +363,10 @@ with DAG(
     
     # HTTP METHOD
     insert_staging_log_data_task >> extract_unique_http_method_task >> build_dim_http_method_table_task
+    
+    
+    # TIME TAKEN
+    insert_staging_log_data_task >> extract_unique_time_taken_task
     
     
     # FACT TABLE
