@@ -8,6 +8,13 @@ import os
 import logging
 from user_agents import parse
 
+additional_bot_browsers = [
+    'Huaweisymantecspider',
+    'HuaweiSymantecSpider',
+    'SurveyBot',
+    'MSIECrawler'
+]
+
 def determine_if_bot():
     try:
         conn = get_db_connection()
@@ -50,4 +57,4 @@ def determine_if_bot():
 
 def is_bot(browser, file_path):
     parsed_ua = parse(browser)
-    return parsed_ua.is_bot or file_path == '/robots.txt'
+    return parsed_ua.is_bot or file_path == '/robots.txt' or parsed_ua.browser.family in additional_bot_browsers

@@ -324,5 +324,17 @@ def get_status_code_type(status_code):
         return 'informational'
     
     
-result = get_status_code_details(0)
-print(result)
+# result = get_status_code_details(0)
+# print(result)
+
+additional_bot_browsers = [
+    'Huaweisymantecspider',
+    'HuaweiSymantecSpider',
+    'SurveyBot',
+    'MSIECrawler'
+]
+
+# result = 
+
+print('SurveyBot' in additional_bot_browsers)
+# parsed_ua.browser.family in additional_bot_browsers
