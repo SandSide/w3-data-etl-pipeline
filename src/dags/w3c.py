@@ -199,6 +199,11 @@ with DAG(
         task_id = 'extract_unique_http_method',
         sql = extract_unique_http_method_query
     )
+    
+    build_dim_http_method_table_task = PostgresOperator(
+        task_id = 'build_dim_http_method_table',
+        sql = build_dim_http_method_table_query
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -333,7 +338,7 @@ with DAG(
     
     
     # HTTP METHOD
-    insert_staging_log_data_task >> extract_unique_http_method_task
+    insert_staging_log_data_task >> extract_unique_http_method_task >> build_dim_http_method_table_task
     
     
     # FACT TABLE
