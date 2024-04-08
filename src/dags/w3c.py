@@ -34,7 +34,10 @@ from common_package.os_tasks import *
 from common_package.file_path_tasks import *
 from common_package.status_code_tasks import *
 from common_package.http_method_tasks import *
-from common_package.time_taken_tasks import *
+from common_package.time_taken_tasks import (
+    extract_unique_time_taken_query,
+    categorize_time_taken
+)
 
 with DAG(
     dag_id = 'Process_W3_Data',                          
@@ -209,6 +212,11 @@ with DAG(
         task_id = 'extract_unique_time_taken',
         sql = extract_unique_time_taken_query
     )
+    
+    categorize_time_taken_task = PythonOperator(
+        task_id = 'categorize_time_taken',
+        python_callable = categorize_time_taken
+    )
 
 
     ##### FACT TASKS ######
@@ -366,7 +374,7 @@ with DAG(
     
     
     # TIME TAKEN
-    insert_staging_log_data_task >> extract_unique_time_taken_task
+    insert_staging_log_data_task >> extract_unique_time_taken_task >> categorize_time_taken_task
     
     
     # FACT TABLE

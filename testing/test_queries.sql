@@ -25,3 +25,16 @@ FROM log_fact_table as f
 INNER JOIN dim_date as d ON f.date_id = d.date_id
 WHERE is_bot = 'f'
 GROUP BY d.week_day;
+
+
+SELECT
+    time_category,
+    min_category_time, 
+    max_category_time,
+    COUNT(*) AS count
+FROM
+    staging_time_taken
+GROUP BY
+    time_category, min_category_time, max_category_time
+ORDER BY 
+    min_category_time;
