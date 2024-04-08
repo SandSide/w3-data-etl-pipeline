@@ -18,9 +18,10 @@ def extract_file_details():
         sql_query = '''
             ALTER TABLE staging_file
             ADD COLUMN IF NOT EXISTS file_path VARCHAR,
+            ADD COLUMN IF NOT EXISTS file_directory VARCHAR,
             ADD COLUMN IF NOT EXISTS file_name VARCHAR,
             ADD COLUMN IF NOT EXISTS file_extension VARCHAR,
-            ADD COLUMN IF NOT EXISTS file_directory VARCHAR;
+            ADD COLUMN IF NOT EXISTS file_type VARCHAR;
             '''
         cursor.execute(sql_query)
         
@@ -35,7 +36,7 @@ def extract_file_details():
             # Insert file details
             cursor.execute('''
                     UPDATE staging_file
-                    SET file_path = %s, file_name = %s, file_extension = %s, file_directory = %s
+                    SET file_path = %s, file_directory = %s, file_name = %s, file_extension = %s, file_type = %s
                     WHERE  file_id = %s;
                     ''', (*values, file_id))
             
@@ -89,8 +90,13 @@ def process_file_path(raw_file_path):
           
     
     # out = (raw_file_path, file_path, file_name, file_extension, file_directory)   
+    
+    file_type = 'file'
+    
+    if file_extension == '':
+        file_type = 'directory'
         
-    return (file_path, file_name, file_extension, file_directory) 
+    return (file_path, file_directory, file_name, file_extension, file_type) 
 
 extract_unique_file_path_query = '''
             DROP TABLE IF EXISTS staging_file;
