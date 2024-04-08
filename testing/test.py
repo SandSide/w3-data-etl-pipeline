@@ -2,7 +2,7 @@ import re
 import os
 import http
 
-RAW_DATA = 'src/data/W3SVC1/'
+RAW_DATA = '../src/data/W3SVC1/'
 # from user_agents import parse
 
 # s = 'Mozilla/4.0+(compatible;+MSIE+7.0;+Windows+NT+5.1;+SIMBAR={425A48EA-D0F7-11DE-A478-001E9090E619};+InfoPath.2;+.NET+CLR+2.0.50727;+OfficeLiveConnector.1.3;+OfficeLivePatch.0.0)'
@@ -164,19 +164,13 @@ def process_log_file(filename):
         
         for line in lines:
             
-            # if (line[0] == '#'):
-            #     print(line)
-            
             if (line[0] != '#'):
-            
+                     
                 result = process_log_line(line)
-                
-            
+                        
                 if result:
                     if not result.endswith('\n'):
                         result += '\n'
-                        
-                    # print(result)
                         
                     out_file.write(result)
 
@@ -336,5 +330,7 @@ additional_bot_browsers = [
 
 # result = 
 
-print('SurveyBot' in additional_bot_browsers)
+# print('SurveyBot' in additional_bot_browsers)
 # parsed_ua.browser.family in additional_bot_browsers
+
+process_raw_data()
