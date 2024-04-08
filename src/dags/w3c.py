@@ -219,7 +219,9 @@ with DAG(
                 SELECT 
                     log_id, date, time, http_method, raw_file_path, ip, browser, os, status_code, response_time, is_bot 
                 FROM 
-                    staging_log_data;
+                    staging_log_data
+            ORDER BY
+                log_id;
             
             
             UPDATE log_fact_table AS f
