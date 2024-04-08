@@ -54,8 +54,11 @@ def extract_file_details():
 
 def process_file_path(raw_file_path):
 
-    file_directory, file_name = os.path.split(raw_file_path)
+    raw_file_path = raw_file_path.lower()
     
+    file_directory, file_name = os.path.split(raw_file_path)
+        
+        
     # Remove anything after +++
     if '+++' in file_name:
         i = file_name.find('+++')
@@ -87,9 +90,6 @@ def process_file_path(raw_file_path):
         file_path = f'{file_directory}{file_name}' 
     else:
         file_path = f'{file_directory}/{file_name}' 
-          
-    
-    # out = (raw_file_path, file_path, file_name, file_extension, file_directory)   
     
     file_type = 'file'
     
