@@ -96,3 +96,10 @@ def determine_category(time_taken):
             if time_taken >= r[1]:
                 return r
             
+            
+build_dim_time_taken_query = '''
+    DROP TABLE IF EXISTS dim_time_taken;
+    
+    CREATE TABLE dim_time_taken AS
+    SELECT * FROM staging_time_taken;
+'''

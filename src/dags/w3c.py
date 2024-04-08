@@ -36,7 +36,8 @@ from common_package.status_code_tasks import *
 from common_package.http_method_tasks import *
 from common_package.time_taken_tasks import (
     extract_unique_time_taken_query,
-    categorize_time_taken
+    categorize_time_taken,
+    build_dim_time_taken_query
 )
 
 with DAG(
@@ -218,6 +219,10 @@ with DAG(
         python_callable = categorize_time_taken
     )
 
+    build_dim_time_taken_table_task = PostgresOperator(
+        task_id = 'build_dim_time_taken_table',
+        sql = build_dim_time_taken_query
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -374,7 +379,7 @@ with DAG(
     
     
     # TIME TAKEN
-    insert_staging_log_data_task >> extract_unique_time_taken_task >> categorize_time_taken_task
+    insert_staging_log_data_task >> extract_unique_time_taken_task >> categorize_time_taken_task >> build_dim_time_taken_table_task
     
     
     # FACT TABLE
