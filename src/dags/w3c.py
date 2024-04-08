@@ -33,6 +33,7 @@ from common_package.browser_tasks import *
 from common_package.os_tasks import *
 from common_package.file_path_tasks import *
 from common_package.status_code_tasks import *
+from common_package.http_method_tasks import *
 
 
 with DAG(
@@ -193,6 +194,11 @@ with DAG(
         sql = build_dim_status_code_table_query,
         dag = dag
     )
+    
+    extract_unique_http_method_task = PostgresOperator(
+        task_id = 'extract_unique_http_method',
+        sql = extract_unique_http_method_query
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -324,6 +330,10 @@ with DAG(
     
     # STATUS CODE
     insert_staging_log_data_task >> extract_unique_status_code_task >> determine_status_code_details_task >> build_dim_status_code_table_task
+    
+    
+    # HTTP METHOD
+    insert_staging_log_data_task >> extract_unique_http_method_task
     
     
     # FACT TABLE
