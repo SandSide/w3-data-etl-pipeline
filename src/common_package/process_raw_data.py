@@ -105,7 +105,7 @@ def insert_staging_log_data():
                     values[-3] = None
                     values[-2] = None
  
-                cursor.execute('INSERT INTO staging_log_data (date, time, http_method, raw_file_path, browser_string, ip, status_code, sc_bytes, cs_bytes, response_time) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', values)
+                cursor.execute('INSERT INTO staging_log_data (date, time, http_method, raw_file_path, browser_string, ip, status_code, sc_bytes, cs_bytes, time_taken) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)', values)
                 
         conn.commit()
             
@@ -132,6 +132,6 @@ create_staging_log_data_table_query = '''
             status_code VARCHAR,
             sc_bytes INT,
             cs_bytes INT,
-            response_time int
+            time_taken INT
         );
 '''      
