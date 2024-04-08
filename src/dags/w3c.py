@@ -236,7 +236,7 @@ with DAG(
                 log_fact_table 
             AS
                 SELECT 
-                    log_id, date, time, http_method, raw_file_path, ip, browser, os, status_code, response_time, is_bot 
+                    log_id, date, time, http_method, raw_file_path, ip, browser, os, status_code, time_taken, is_bot 
                 FROM 
                     staging_log_data
             ORDER BY
@@ -328,6 +328,22 @@ with DAG(
                 log_fact_table
             RENAME COLUMN 
                 http_method TO http_method_id;         
+
+
+
+            UPDATE 
+                log_fact_table AS f
+            SET 
+                time_taken = dim.time_taken_id
+            FROM 
+                dim_time_taken AS dim
+            WHERE 
+                f.time_taken = dim.time_taken;
+            
+            ALTER TABLE 
+                log_fact_table
+            RENAME COLUMN 
+                time_taken TO time_taken_id; 
  
 
             ALTER TABLE log_fact_table
@@ -392,7 +408,8 @@ with DAG(
         build_dim_file_table_task, 
         build_dim_time_table_task, 
         build_dim_status_code_table_task,
-        build_dim_http_method_table_task
+        build_dim_http_method_table_task,
+        build_dim_time_taken_table_task
     ]
     
     

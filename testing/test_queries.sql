@@ -38,3 +38,19 @@ GROUP BY
     time_category, min_category_time, max_category_time
 ORDER BY 
     min_category_time;
+
+
+
+SELECT 
+    d.time_category, COUNT(*) 
+FROM 
+    log_fact_table as f
+INNER JOIN 
+    dim_time_taken as d 
+ON 
+    f.time_taken_id = d.time_taken_id
+GROUP BY 
+    d.time_category, d.min_category_time
+ORDER BY 
+    d.min_category_time DESC;
+
