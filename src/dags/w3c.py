@@ -217,7 +217,7 @@ with DAG(
                 log_fact_table 
             AS
                 SELECT 
-                    log_id, date, time, raw_file_path, ip, browser, os, status_code, response_time, is_bot 
+                    log_id, date, time, http_method, raw_file_path, ip, browser, os, status_code, response_time, is_bot 
                 FROM 
                     staging_log_data;
             
@@ -292,7 +292,22 @@ with DAG(
                 log_fact_table
             RENAME COLUMN 
                 status_code TO status_code_id;
+                
+                
+            UPDATE 
+                log_fact_table AS f
+            SET 
+                http_method = dim.http_method_id
+            FROM 
+                dim_http_method AS dim
+            WHERE 
+                f.http_method = dim.http_method;
             
+            ALTER TABLE 
+                log_fact_table
+            RENAME COLUMN 
+                http_method TO http_method_id;         
+ 
 
             ALTER TABLE log_fact_table
             ALTER COLUMN date_id TYPE INT USING date_id::INT,
@@ -301,7 +316,8 @@ with DAG(
             ALTER COLUMN ip_id TYPE INT USING ip_id::INT,
             ALTER COLUMN browser_id TYPE INT USING browser_id::INT,
             ALTER COLUMN os_id TYPE INT USING os_id::INT,
-            ALTER COLUMN status_code_id TYPE INT USING status_code_id::INT;
+            ALTER COLUMN status_code_id TYPE INT USING status_code_id::INT,
+            ALTER COLUMN http_method_id TYPE INT USING http_method_id::INT;
         '''
     )
 
@@ -350,7 +366,8 @@ with DAG(
         build_dim_os_table_task, 
         build_dim_file_table_task, 
         build_dim_time_table_task, 
-        build_dim_status_code_table_task
+        build_dim_status_code_table_task,
+        build_dim_http_method_table_task
     ]
     
     
