@@ -40,6 +40,12 @@ from common_package.time_taken_tasks import (
     build_dim_time_taken_query
 )
 
+from common_package.device_tasks import (
+    determine_device_details,
+    extract_unique_device_query,
+    build_dim_device_query
+)
+
 with DAG(
     dag_id = 'Process_W3_Data',                          
     schedule_interval = '@weekly',                                     
@@ -223,6 +229,21 @@ with DAG(
         task_id = 'build_dim_time_taken_table',
         sql = build_dim_time_taken_query
     )
+    
+    determine_device_details_task = PythonOperator(
+        task_id = 'determine_device_details',
+        python_callable = determine_device_details
+    )
+    
+    extract_unique_device_task = PostgresOperator(
+        task_id = 'extract_unique_device',
+        sql = extract_unique_device_query
+    )
+    
+    build_dim_device_table_task = PostgresOperator(
+        task_id = 'build_dim_device_table',
+        sql = build_dim_device_query
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -236,7 +257,7 @@ with DAG(
                 log_fact_table 
             AS
                 SELECT 
-                    log_id, date, time, http_method, raw_file_path, ip, browser, os, status_code, time_taken, is_bot 
+                    log_id, date, time, http_method, raw_file_path, ip, browser, os, device_type, status_code, time_taken, is_bot 
                 FROM 
                     staging_log_data
             ORDER BY
@@ -344,6 +365,21 @@ with DAG(
                 log_fact_table
             RENAME COLUMN 
                 time_taken TO time_taken_id; 
+                
+                
+            UPDATE 
+                log_fact_table AS f
+            SET 
+                device_type = dim.device_id
+            FROM 
+                dim_device AS dim
+            WHERE 
+                f.device_type = dim.device_type;
+            
+            ALTER TABLE 
+                log_fact_table
+            RENAME COLUMN 
+                device_type TO device_id; 
  
 
             ALTER TABLE log_fact_table
@@ -353,6 +389,7 @@ with DAG(
             ALTER COLUMN ip_id TYPE INT USING ip_id::INT,
             ALTER COLUMN browser_id TYPE INT USING browser_id::INT,
             ALTER COLUMN os_id TYPE INT USING os_id::INT,
+            ALTER COLUMN device_id TYPE INT USING device_id::INT,
             ALTER COLUMN status_code_id TYPE INT USING status_code_id::INT,
             ALTER COLUMN http_method_id TYPE INT USING http_method_id::INT;
         '''
@@ -398,6 +435,11 @@ with DAG(
     insert_staging_log_data_task >> extract_unique_time_taken_task >> categorize_time_taken_task >> build_dim_time_taken_table_task
     
     
+    # DEVICE
+    
+    insert_staging_log_data_task >> determine_device_details_task >> extract_unique_device_task >> build_dim_device_table_task
+    
+    
     # FACT TABLE
     fact_table_dependencies = [
         determine_if_bot_task, 
@@ -409,7 +451,8 @@ with DAG(
         build_dim_time_table_task, 
         build_dim_status_code_table_task,
         build_dim_http_method_table_task,
-        build_dim_time_taken_table_task
+        build_dim_time_taken_table_task,
+        build_dim_device_table_task
     ]
     
     
