@@ -257,7 +257,7 @@ with DAG(
                 log_fact_table 
             AS
                 SELECT 
-                    log_id, date, time, http_method, raw_file_path, ip, browser, os, status_code, time_taken, is_bot 
+                    log_id, date, time, http_method, raw_file_path, ip, browser, os, device_type, status_code, time_taken, is_bot 
                 FROM 
                     staging_log_data
             ORDER BY
@@ -365,6 +365,21 @@ with DAG(
                 log_fact_table
             RENAME COLUMN 
                 time_taken TO time_taken_id; 
+                
+                
+            UPDATE 
+                log_fact_table AS f
+            SET 
+                device_type = dim.device_id
+            FROM 
+                dim_device AS dim
+            WHERE 
+                f.device_type = dim.device_type;
+            
+            ALTER TABLE 
+                log_fact_table
+            RENAME COLUMN 
+                device_type TO device_id; 
  
 
             ALTER TABLE log_fact_table
@@ -374,6 +389,7 @@ with DAG(
             ALTER COLUMN ip_id TYPE INT USING ip_id::INT,
             ALTER COLUMN browser_id TYPE INT USING browser_id::INT,
             ALTER COLUMN os_id TYPE INT USING os_id::INT,
+            ALTER COLUMN device_id TYPE INT USING device_id::INT,
             ALTER COLUMN status_code_id TYPE INT USING status_code_id::INT,
             ALTER COLUMN http_method_id TYPE INT USING http_method_id::INT;
         '''
@@ -435,7 +451,8 @@ with DAG(
         build_dim_time_table_task, 
         build_dim_status_code_table_task,
         build_dim_http_method_table_task,
-        build_dim_time_taken_table_task
+        build_dim_time_taken_table_task,
+        build_dim_device_table_task
     ]
     
     

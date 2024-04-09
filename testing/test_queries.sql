@@ -58,3 +58,15 @@ GROUP BY
 ORDER BY 
     d.min_category_time DESC;
 
+
+
+SELECT 
+    d.device_type, COUNT(*)
+FROM 
+    log_fact_table as f
+INNER JOIN 
+    dim_device as d 
+ON 
+    f.device_id = d.device_id
+GROUP BY
+    d.device_type
