@@ -84,3 +84,10 @@ extract_unique_device_query = '''
     INSERT INTO staging_device (device_type)
     SELECT DISTINCT device_type from staging_log_data;
 '''
+
+build_dim_device_query =  '''
+    DROP TABLE IF EXISTS dim_device;
+    
+    CREATE TABLE dim_device AS
+    SELECT * FROM staging_device;
+'''  
