@@ -41,7 +41,8 @@ from common_package.time_taken_tasks import (
 )
 
 from common_package.device_tasks import (
-    determine_device_details
+    determine_device_details,
+    extract_unique_device_query
 )
 
 with DAG(
@@ -232,6 +233,11 @@ with DAG(
         task_id = 'determine_device_details',
         python_callable = determine_device_details
     )
+    
+    extract_unique_device_task = PostgresOperator(
+        task_id = 'extract_unique_device',
+        sql = extract_unique_device_query
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -409,7 +415,7 @@ with DAG(
     
     # DEVICE
     
-    insert_staging_log_data_task >> determine_device_details_task
+    insert_staging_log_data_task >> determine_device_details_task >> extract_unique_device_task
     
     
     # FACT TABLE

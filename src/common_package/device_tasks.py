@@ -73,6 +73,14 @@ def determine_device_type(ua):
     elif ua.is_pc:
         return 'PC'
     
-    
 extract_unique_device_query = '''
+    DROP TABLE IF EXISTS staging_device;
+    
+    CREATE TABLE staging_device (
+        device_id SERIAL PRIMARY KEY,
+        device_type VARCHAR
+    );
+    
+    INSERT INTO staging_device (device_type)
+    SELECT DISTINCT device_type from staging_log_data;
 '''
