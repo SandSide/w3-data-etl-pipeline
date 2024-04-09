@@ -1,7 +1,6 @@
 /src/logs/scheduler
 /src/logs
 /src/dags/__pycache__
-/src/data/staging
 /src/data/star-schema
 /src/logs/dag_processor_manager
 src/logs/dag_processor_manager/dag_processor_manager.log
@@ -10,3 +9,4 @@ test-merged-data.txt
 /src/common_package/__pycache__
 /src/dags/__pycache__
 /src/dags/__pycache__
+src/data/staging/merged-data.txt

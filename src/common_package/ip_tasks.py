@@ -46,10 +46,12 @@ def determine_ip_location():
                     SET country_code = %s, country_name = %s, latitude = %s, longitude = %s
                     WHERE ip = %s;
                     ''', (*result, ip))
+                
+                conn.commit()
             else:
                 logging.debug(f"Location information not found for IP: {ip}")
 
-        conn.commit()
+        #conn.commit()
         
     except Exception as e:
         conn.rollback()
@@ -72,7 +74,7 @@ def get_ip_location(ip):
         response = requests.get(request_url)
         result = response.content.decode()
     except:
-        logging.exception('error response ' + result)
+        #logging.exception('error response ' + result)
         return
         
         
