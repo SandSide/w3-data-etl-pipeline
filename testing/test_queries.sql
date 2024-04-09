@@ -34,6 +34,8 @@ SELECT
     COUNT(*) AS count
 FROM
     staging_time_taken
+WHERE
+    min_category_time < 5000
 GROUP BY
     time_category, min_category_time, max_category_time
 ORDER BY 
@@ -49,6 +51,8 @@ INNER JOIN
     dim_time_taken as d 
 ON 
     f.time_taken_id = d.time_taken_id
+WHERE
+    min_category_time < 5000
 GROUP BY 
     d.time_category, d.min_category_time
 ORDER BY 

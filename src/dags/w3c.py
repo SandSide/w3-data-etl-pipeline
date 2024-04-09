@@ -40,6 +40,10 @@ from common_package.time_taken_tasks import (
     build_dim_time_taken_query
 )
 
+from common_package.device_tasks import (
+    determine_device_details
+)
+
 with DAG(
     dag_id = 'Process_W3_Data',                          
     schedule_interval = '@weekly',                                     
@@ -223,6 +227,11 @@ with DAG(
         task_id = 'build_dim_time_taken_table',
         sql = build_dim_time_taken_query
     )
+    
+    determine_device_details_task = PythonOperator(
+        task_id = 'determine_device_details',
+        python_callable = determine_device_details
+    )
 
     ##### FACT TASKS ######
     build_fact_table_task = PostgresOperator(
@@ -396,6 +405,11 @@ with DAG(
     
     # TIME TAKEN
     insert_staging_log_data_task >> extract_unique_time_taken_task >> categorize_time_taken_task >> build_dim_time_taken_table_task
+    
+    
+    # DEVICE
+    
+    insert_staging_log_data_task >> determine_device_details_task
     
     
     # FACT TABLE
